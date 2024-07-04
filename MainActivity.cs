@@ -20,19 +20,13 @@ namespace BookingSMSReminder
             public string? PhoneNumber;
             public string Message;
 
-            public Contact? Contact;
+            public Data.Contact? Contact;
             public DateTime? StartTime;
 
             public override string ToString()
             {
                 return Enabled ? $"[{Name}, {PhoneNumber}] {Message}" : Message;
             }
-        }
-
-        class Contact
-        {
-            public string DisplayName;
-            public string? MostLikelyNumber;
         }
 
         // TODO reminder listview adapter
@@ -176,7 +170,6 @@ namespace BookingSMSReminder
         }
 
         private ListView? listViewReminders_;
-        private Dictionary<string, Contact> contacts_;
 
         private ReminderAdapter remindersAdapter_;
         private List<Reminder> reminders_ = new List<Reminder>();
@@ -211,13 +204,17 @@ namespace BookingSMSReminder
             var buttonSendSelected = FindViewById<Button>(Resource.Id.button_send_selected);
             buttonSendSelected.Click += ButtonSendSelected_Click;
 
-            contacts_ = LoadContacts().ToDictionary(x=>x.DisplayName.ToLower());
+            var buttonAddBooking = FindViewById<Button>(Resource.Id.button_add_booking);
+            buttonAddBooking.Click += ButtonAddBooking_Click;
+
+            Data.Instance.Initialize(this);
 
             handler_ = new Handler();
 
             StartRepeatingTask();
         }
 
+        
         protected override void OnDestroy()
         {
             base.OnDestroy();
@@ -255,6 +252,12 @@ namespace BookingSMSReminder
                 var nm = (NotificationManager)GetSystemService(NotificationService);
                 nm.Notify(0, notification);
             }
+        }
+
+        private void ButtonAddBooking_Click(object? sender, EventArgs e)
+        {
+            Intent switchActivityIntent = new Intent(this, typeof(AddBookingActivity));
+            StartActivity(switchActivityIntent);
         }
 
         private void ButtonSendSelected_Click(object? sender, EventArgs e)
@@ -345,60 +348,7 @@ namespace BookingSMSReminder
             smsManager.SendTextMessage(phone, null, message, sentPI, null);
         }
 
-        private IEnumerable<Contact> LoadContacts()
-        {
-            var uri = ContactsContract.RawContacts.ContentUri;
-            string[] projection = {
-                ContactsContract.RawContacts.InterfaceConsts.ContactId,
-                ContactsContract.RawContacts.InterfaceConsts.DisplayNamePrimary,
-            };
-
-            var selectionString = ContactsContract.RawContacts.InterfaceConsts.AccountName + "=?";
-            var selectionStringArgs = new string[] { "kineticmobilept@gmail.com" };
-            var loader = new CursorLoader(this, uri, projection, selectionString, selectionStringArgs, null);
-            var cursor = (ICursor)loader.LoadInBackground();
-
-            if (cursor.MoveToFirst())
-            {
-                do
-                {
-                    var id = cursor.GetString(cursor.GetColumnIndex(projection[0]));
-                    //Phone Numbers
-                    string[] columnsNames2 = new string[] {
-                        ContactsContract.CommonDataKinds.Phone.Number,
-                        ContactsContract.CommonDataKinds.Phone.InterfaceConsts.ContactId
-                    };
-
-                    //Store Contact ID
-                    string[] selectionStringArgs2 = new string[] { id };
-                    string selectionString2 = ContactsContract.CommonDataKinds.Phone.InterfaceConsts.ContactId + "=?";
-                    var loader2 = new CursorLoader(this, ContactsContract.CommonDataKinds.Phone.ContentUri, columnsNames2, selectionString2, selectionStringArgs2, null);
-                    var cursor2 = (ICursor)loader2.LoadInBackground();
-
-                    string? mostLikelyNumber = null;
-                    if (cursor2.MoveToFirst())
-                    {
-                        do
-                        {
-                            var contactId = cursor2.GetString(cursor2.GetColumnIndex(columnsNames2[1]));
-                            var number = cursor2.GetString(cursor2.GetColumnIndex(columnsNames2[0])).Trim().Replace(" ", "");
-                            if (number.StartsWith("04") || number.StartsWith("+614"))
-                            {
-                                mostLikelyNumber = number;
-                                break;
-                            }
-                        }
-                        while (cursor2.MoveToNext());
-                    }
-
-                    yield return new Contact
-                    {
-                        DisplayName = cursor.GetString(cursor.GetColumnIndex(projection[1])),
-                        MostLikelyNumber = mostLikelyNumber
-                    };
-                } while (cursor.MoveToNext());
-            }
-        }
+        
         
         private IEnumerable<Reminder> GenerateReminders()
         {
@@ -467,7 +417,7 @@ namespace BookingSMSReminder
                             clientName = clientName[..index].Trim();
                         }
 
-                        if (contacts_.TryGetValue(clientName.ToLower(), out var contact))
+                        if (Data.Instance.Contacts.TryGetValue(clientName.ToLower(), out var contact))
                         {
                             if (!GetIfMessageSent(contact, dtStart))
                             {
@@ -531,17 +481,17 @@ namespace BookingSMSReminder
         {
             string[] Months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
             string[] DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-            var hour = dtStart.Hour > 12 ? dtStart.Hour - 12 : dtStart.Hour;
-            var ampm = dtStart.Hour > 12 ? "pm" : "am";
-            var min = dtStart.Minute;
+
+            var timeStr = Utility.PrintTime(dtStart.Hour, dtStart.Minute);
+
             var day = dtStart.Day;
             var month = Months[dtStart.Month-1];
             var year = dtStart.Year;
             var dayOfWeek = DaysOfWeek[(int)dtStart.DayOfWeek];
-            return $"{dayOfWeek} {day} {month} {year} @ {hour}:{min:00}{ampm}";
+            return $"{dayOfWeek} {day} {month} {year} @ {timeStr}";
         }
 
-        private bool GetIfMessageSent(Contact contact, DateTime startTime)
+        private bool GetIfMessageSent(Data.Contact contact, DateTime startTime)
         {
             var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
             var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");
@@ -566,7 +516,7 @@ namespace BookingSMSReminder
             return false;
         }
 
-        private void CleanUpSentMessageDataFileAndAddNewEntry((Contact, DateTime)? newEntry)
+        private void CleanUpSentMessageDataFileAndAddNewEntry((Data.Contact, DateTime)? newEntry)
         {
             var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
             var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");

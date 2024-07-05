@@ -102,15 +102,15 @@ namespace BookingSMSReminder
 
                 CheckBox cb = convertView.FindViewById<CheckBox>(Resource.Id.to_send);
 
-
                 if (reminder.Enabled)
                 {
                     cb.Enabled = true;
-                    cb.Checked = reminders_[position].ToSend;
+                    cb.Checked = reminder.ToSend;
                 }
                 else
                 {
                     cb.Enabled = false;
+                    cb.Checked = false;
                 }
 
                 return convertView;

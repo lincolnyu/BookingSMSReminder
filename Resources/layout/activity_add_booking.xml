@@ -11,7 +11,7 @@
         android:layout_width="fill_parent"
         android:layout_height="fill_parent">
       <Button
-            android:text="Back to main"
+            android:text="Back to Main"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/button_back_to_main"
@@ -73,7 +73,7 @@
         android:layout_height="wrap_content" /> 
 
       <Button
-        android:text="Confirm and add booking"
+        android:text="Confirm and Add Booking"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/button_confirm_adding"

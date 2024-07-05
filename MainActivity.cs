@@ -277,29 +277,18 @@ namespace BookingSMSReminder
                 }
             }
 
-            // Create the object of AlertDialog Builder class 
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
+            var sb = new System.Text.StringBuilder();
+            if (c > 0)
             {
-                // Set the message show for the Alert time 
-                var sb = new System.Text.StringBuilder();
                 sb.AppendLine($"Messages have been sent to the following {c} persons:");
                 sb.Append(string.Join(", ", persons));
                 sb.Append(".");
-                builder.SetMessage(sb.ToString());
             }
-
-            // Set Alert Title 
-            builder.SetTitle("Messages Sent.");
-
-            // Set Cancelable false for when the user clicks on the outside the Dialog Box then it will remain show 
-            builder.SetCancelable(false);
-
-            // Set the positive button with yes name Lambda OnClickListener method is use of DialogInterface interface. 
-            builder.SetPositiveButton("Yes", (sender, args) => {
-            });
-
-            builder.Show();
+            else
+            {
+                sb.AppendLine($"No messages have been sent.");
+            }
+            Utility.ShowAlert(this, "Message Sent", sb.ToString(), "OK");
 
             RefreshReminders();
         }

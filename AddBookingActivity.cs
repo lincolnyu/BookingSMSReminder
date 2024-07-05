@@ -1,5 +1,4 @@
-﻿
-using Android.Content;
+﻿using Android.Content;
 using Java.Text;
 using Java.Util;
 
@@ -92,27 +91,38 @@ namespace BookingSMSReminder
 
         private void ButtonBackToMain_Click(object? sender, EventArgs e)
         {
+            ReturnToMain();
+        }
+
+        private void ReturnToMain()
+        {
             Intent switchActivityIntent = new Intent(this, typeof(MainActivity));
             StartActivity(switchActivityIntent);
         }
 
+        private void ClearClientName()
+        {
+            AutoCompleteTextView acTextView = FindViewById<AutoCompleteTextView>(Resource.Id.text_client);
+            acTextView.Text = "";
+        }
+
         private void ButtonConfirmAdd_Click(object? sender, EventArgs e)
         {
-            var durationText = FindViewById<EditText>(Resource.Id.appt_duration);
-            if (!int.TryParse(durationText.Text, out var durationMins))
-            {
-                // TODO report error.
-                return;
-            }
-            int durationMs = durationMins * 60 * 1000;
-
             var clientText = FindViewById<EditText>(Resource.Id.text_client);
             var client = clientText.Text;
             if (string.IsNullOrEmpty(client))
             {
-                // TODO report error.
+                Utility.ShowAlert(this, "Error", "Client not specified.", "OK");
                 return;
             }
+
+            var durationText = FindViewById<EditText>(Resource.Id.appt_duration);
+            if (!int.TryParse(durationText.Text, out var durationMins))
+            {
+                Utility.ShowAlert(this, "Error", "Invlaid duration value.", "OK");
+                return;
+            }
+            int durationMs = durationMins * 60 * 1000;
 
             Intent intent = new Intent(Intent.ActionEdit);
             intent.SetType("vnd.android.cursor.item/event");
@@ -121,6 +131,12 @@ namespace BookingSMSReminder
             intent.PutExtra("endTime", calendar_.TimeInMillis + durationMs);
             intent.PutExtra("title", $"{client} booking");
             StartActivity(intent);
+
+            // This will open up a new event dialog from Calendar app.
+            // Can't return to main here as this will interrupt the event adding.
+            // Just clear the form.
+
+            ClearClientName();
         }
     }
 }

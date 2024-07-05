@@ -52,13 +52,12 @@ namespace BookingSMSReminder
                 {
                     var id = cursor.GetString(cursor.GetColumnIndex(projection[0]));
                     //Phone Numbers
-                    string[] columnsNames2 = new string[] {
+                    string[] columnsNames2 = [
                         ContactsContract.CommonDataKinds.Phone.Number,
-                        ContactsContract.CommonDataKinds.Phone.InterfaceConsts.ContactId
-                    };
+                    ];
 
                     //Store Contact ID
-                    string[] selectionStringArgs2 = new string[] { id };
+                    string[] selectionStringArgs2 = [id];
                     string selectionString2 = ContactsContract.CommonDataKinds.Phone.InterfaceConsts.ContactId + "=?";
                     var loader2 = new CursorLoader(context, ContactsContract.CommonDataKinds.Phone.ContentUri, columnsNames2, selectionString2, selectionStringArgs2, null);
                     var cursor2 = (ICursor)loader2.LoadInBackground();
@@ -68,10 +67,14 @@ namespace BookingSMSReminder
                     {
                         do
                         {
-                            var contactId = cursor2.GetString(cursor2.GetColumnIndex(columnsNames2[1]));
                             var number = cursor2.GetString(cursor2.GetColumnIndex(columnsNames2[0])).Trim().Replace(" ", "");
                             if (number.StartsWith("04") || number.StartsWith("+614"))
                             {
+                                // normalize to 04
+                                if (number.StartsWith("+614"))
+                                {
+                                    number = "0" + number[3..];
+                                }
                                 mostLikelyNumber = number;
                                 break;
                             }

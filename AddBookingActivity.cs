@@ -1,6 +1,5 @@
 ﻿
 using Android.Content;
-using Android.Text.Format;
 using Java.Text;
 using Java.Util;
 
@@ -92,8 +91,30 @@ namespace BookingSMSReminder
 
         private void ButtonConfirmAdd_Click(object? sender, EventArgs e)
         {
-            // TODO add to calednar.
-            throw new NotImplementedException();
+            var durationText = FindViewById<EditText>(Resource.Id.appt_duration);
+            if (!int.TryParse(durationText.Text, out var durationMins))
+            {
+                // TODO report error.
+                return;
+            }
+            int durationMs = durationMins * 60 * 1000;
+
+            var clientText = FindViewById<EditText>(Resource.Id.text_client);
+            var client = clientText.Text;
+            if (string.IsNullOrEmpty(client))
+            {
+                // TODO report error.
+                return;
+            }
+
+            Intent intent = new Intent(Intent.ActionEdit);
+            intent.SetType("vnd.android.cursor.item/event");
+            intent.PutExtra("beginTime", calendar_.TimeInMillis);
+            intent.PutExtra("allDay", false);
+            intent.PutExtra("endTime", calendar_.TimeInMillis + durationMs);
+            intent.PutExtra("title", $"{client} booking");
+            StartActivity(intent);
         }
     }
 }
+ 

@@ -4,7 +4,7 @@ using Java.Util;
 
 namespace BookingSMSReminder
 {
-    [Activity()]
+    [Activity]
     public class AddBookingActivity : Activity
     {
         Calendar calendar_ = Calendar.Instance;
@@ -24,9 +24,9 @@ namespace BookingSMSReminder
 
             // https://stackoverflow.com/questions/31052436/android-edittext-with-drop-down-list
 
-            var clients = Data.Instance.Contacts.Keys;
+            var clients = Data.Instance.Contacts.Values.Select(x=>x.DisplayName).ToArray();
 
-            var adapter = new ArrayAdapter<string>(this, Resource.Layout.activity_client_suggestion, Resource.Id.select_client_name, clients.ToArray());
+            var adapter = new ArrayAdapter<string>(this, Resource.Layout.activity_client_suggestion, Resource.Id.select_client_name, clients);
             //Find TextView control
             AutoCompleteTextView acTextView = FindViewById<AutoCompleteTextView>(Resource.Id.text_client);
             //Set the number of characters the user must type before the drop down list is shown

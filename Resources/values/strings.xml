@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Booking SMS Reminder</string>
-    <string name="appt_date">Appointment Date</string>
+    <string name="app_version">1.2</string>
 </resources>

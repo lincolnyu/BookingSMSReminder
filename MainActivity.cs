@@ -207,7 +207,7 @@ namespace BookingSMSReminder
             var buttonAddBooking = FindViewById<Button>(Resource.Id.button_add_booking);
             buttonAddBooking.Click += ButtonAddBooking_Click;
 
-            Data.Instance.Initialize(this);
+            Data.Instance.ReloadContacts(this);
 
             handler_ = new Handler();
 
@@ -226,7 +226,8 @@ namespace BookingSMSReminder
         {
             base.OnResume();
 
-            Refresh();
+            Data.Instance.ReloadContacts(this);
+            RefreshReminders();
         }
 
         private void StartRepeatingTask()
@@ -241,7 +242,7 @@ namespace BookingSMSReminder
 
         private void CheckDelayReminder()
         {
-            Refresh();
+            RefreshReminders();
 
             if (reminders_.Count > 0)
             {
@@ -300,7 +301,7 @@ namespace BookingSMSReminder
 
             builder.Show();
 
-            Refresh();
+            RefreshReminders();
         }
 
         private void ButtonSelectNone_Click(object? sender, EventArgs e)
@@ -324,7 +325,7 @@ namespace BookingSMSReminder
             remindersAdapter_.NotifyDataSetChanged();
         }
 
-        private void Refresh()
+        private void RefreshReminders()
         {
             lock (this)
             {

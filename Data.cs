@@ -28,7 +28,7 @@ namespace BookingSMSReminder
 
         public Dictionary<string, Contact> Contacts { get; private set; }
 
-        public void Initialize(Context context)
+        public void ReloadContacts(Context context)
         {
             Contacts = LoadContacts(context).ToDictionary(x => x.DisplayName.ToLower());
         }

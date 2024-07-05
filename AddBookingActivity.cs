@@ -42,6 +42,13 @@ namespace BookingSMSReminder
             editTime.Click += EditTime_Click;
         }
 
+        protected override void OnResume()
+        {
+            base.OnResume();
+
+            Data.Instance.ReloadContacts(this);
+        }
+
         private void EditTime_Click(object? sender, EventArgs e)
         {
             EventHandler<TimePickerDialog.TimeSetEventArgs> handler = (sender, args) =>

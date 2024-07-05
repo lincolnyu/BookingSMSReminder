@@ -8,6 +8,7 @@ namespace BookingSMSReminder
     {
         public class Contact
         {
+            public Contact(string displayName) { DisplayName = displayName; }
             public string DisplayName;
             public string? MostLikelyNumber;
         }
@@ -46,7 +47,7 @@ namespace BookingSMSReminder
             var loader = new CursorLoader(context, uri, projection, selectionString, selectionStringArgs, null);
             var cursor = (ICursor)loader.LoadInBackground();
 
-            if (cursor.MoveToFirst())
+            if (cursor != null && cursor.MoveToFirst())
             {
                 do
                 {
@@ -63,7 +64,7 @@ namespace BookingSMSReminder
                     var cursor2 = (ICursor)loader2.LoadInBackground();
 
                     string? mostLikelyNumber = null;
-                    if (cursor2.MoveToFirst())
+                    if (cursor2 != null && cursor2.MoveToFirst())
                     {
                         do
                         {
@@ -82,9 +83,8 @@ namespace BookingSMSReminder
                         while (cursor2.MoveToNext());
                     }
 
-                    yield return new Contact
+                    yield return new Contact(displayName: cursor.GetString(cursor.GetColumnIndex(projection[1])))
                     {
-                        DisplayName = cursor.GetString(cursor.GetColumnIndex(projection[1])),
                         MostLikelyNumber = mostLikelyNumber
                     };
                 } while (cursor.MoveToNext());

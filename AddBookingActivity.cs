@@ -1,6 +1,9 @@
 ﻿using Android.Content;
+using Android.Provider;
+using Java.Lang;
 using Java.Text;
 using Java.Util;
+using static Android.Provider.CalendarContract;
 
 namespace BookingSMSReminder
 {
@@ -24,7 +27,7 @@ namespace BookingSMSReminder
 
             // https://stackoverflow.com/questions/31052436/android-edittext-with-drop-down-list
 
-            var clients = Data.Instance.Contacts.Values.Select(x=>x.DisplayName).ToArray();
+            var clients = Data.Instance.Contacts.Values.Select(x => x.DisplayName).ToArray();
 
             var adapter = new ArrayAdapter<string>(this, Resource.Layout.activity_client_suggestion, Resource.Id.select_client_name, clients);
             //Find TextView control
@@ -108,36 +111,93 @@ namespace BookingSMSReminder
 
         private void ButtonConfirmAdd_Click(object? sender, EventArgs e)
         {
-            var clientText = FindViewById<EditText>(Resource.Id.text_client);
-            var client = clientText.Text;
-            if (string.IsNullOrEmpty(client))
+            var checkAddDirectly = FindViewById<CheckBox>(Resource.Id.add_directly);
+            if (checkAddDirectly.Checked)
             {
-                Utility.ShowAlert(this, "Error", "Client not specified.", "OK");
-                return;
-            }
+                var clientText = FindViewById<EditText>(Resource.Id.text_client);
+                var client = clientText.Text;
+                if (string.IsNullOrEmpty(client))
+                {
+                    Utility.ShowAlert(this, "Error", "Client not specified.", "OK");
+                    return;
+                }
 
-            var durationText = FindViewById<EditText>(Resource.Id.appt_duration);
-            if (!int.TryParse(durationText.Text, out var durationMins))
+                var durationText = FindViewById<EditText>(Resource.Id.appt_duration);
+                if (!int.TryParse(durationText.Text, out var durationMins))
+                {
+                    Utility.ShowAlert(this, "Error", "Invlaid duration value.", "OK");
+                    return;
+                }
+                int durationMs = durationMins * 60 * 1000;
+
+                var kmpCalId = Utility.GetKmpCalendarId(this);
+
+                if (kmpCalId == null)
+                {
+                    Utility.ShowAlert(this, "Error", "Business calendar not found.", "OK");
+                    return;
+                }
+
+                ContentValues values = new ContentValues();
+                values.Put("calendar_id", kmpCalId.Value);
+                values.Put("title", $"{client} booking");
+                values.Put("dtstart", calendar_.TimeInMillis);
+                values.Put("dtend", calendar_.TimeInMillis + durationMs);
+                values.Put("eventTimezone", Java.Util.TimeZone.Default.ID);
+                values.Put("hasAlarm", 1);
+
+                // This adds the event to calendar direclty.
+                // It may take some time for it to show in the calendar.
+                // That's why we don't use the commented out code to view the created event.
+                ContentResolver contentResolver = this.ContentResolver;
+                Android.Net.Uri uri = contentResolver.Insert(CalendarContract.Events.ContentUri, values);
+
+#if false
+                // launch the editor to edit the 'placeholder' event
+                long eventId = long.Parse(uri.LastPathSegment);
+                Intent intent = new Intent(Intent.ActionEdit);
+                intent.SetData(ContentUris.WithAppendedId(CalendarContract.Events.ContentUri, eventId));
+                StartActivityForResult(intent, 0);
+#endif
+
+                ClearClientName();
+
+                Utility.ShowAlert(this, "Calendar Event Added", "Appointment added. Please check the calendar to make sure.", "OK");
+            }
+            else
             {
-                Utility.ShowAlert(this, "Error", "Invlaid duration value.", "OK");
-                return;
+                // References
+                // https://stackoverflow.com/questions/16068082/how-can-i-add-event-to-the-calendar-automatically
+
+                var clientText = FindViewById<EditText>(Resource.Id.text_client);
+                var client = clientText.Text;
+                if (string.IsNullOrEmpty(client))
+                {
+                    Utility.ShowAlert(this, "Error", "Client not specified.", "OK");
+                    return;
+                }
+
+                var durationText = FindViewById<EditText>(Resource.Id.appt_duration);
+                if (!int.TryParse(durationText.Text, out var durationMins))
+                {
+                    Utility.ShowAlert(this, "Error", "Invlaid duration value.", "OK");
+                    return;
+                }
+                int durationMs = durationMins * 60 * 1000;
+
+                Intent intent = new Intent(Intent.ActionEdit);
+                intent.SetType("vnd.android.cursor.item/event");
+                intent.PutExtra("beginTime", calendar_.TimeInMillis);
+                intent.PutExtra("allDay", false);
+                intent.PutExtra("endTime", calendar_.TimeInMillis + durationMs);
+                intent.PutExtra("title", $"{client} booking");
+                StartActivity(intent);
+
+                // This will open up a new event dialog from Calendar app.
+                // Can't return to main here as this will interrupt the event adding.
+                // Just clear the form.
+                ClearClientName();
             }
-            int durationMs = durationMins * 60 * 1000;
-
-            Intent intent = new Intent(Intent.ActionEdit);
-            intent.SetType("vnd.android.cursor.item/event");
-            intent.PutExtra("beginTime", calendar_.TimeInMillis);
-            intent.PutExtra("allDay", false);
-            intent.PutExtra("endTime", calendar_.TimeInMillis + durationMs);
-            intent.PutExtra("title", $"{client} booking");
-            StartActivity(intent);
-
-            // This will open up a new event dialog from Calendar app.
-            // Can't return to main here as this will interrupt the event adding.
-            // Just clear the form.
-
-            ClearClientName();
         }
     }
 }
- 

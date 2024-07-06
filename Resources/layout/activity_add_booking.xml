@@ -71,12 +71,21 @@
         android:inputType="number"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content" /> 
-
-      <Button
-        android:text="Confirm and Add Booking"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/button_confirm_adding"
-        android:layout_alignParentLeft="true" />
+      <LinearLayout
+          android:layout_width="fill_parent"
+          android:layout_height="fill_parent"
+          android:orientation="horizontal">
+          <CheckBox
+              android:text="Add Directly"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:id="@+id/add_directly"/>
+          <Button
+            android:text="Add"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_confirm_adding"
+            android:layout_alignParentLeft="true" />
+      </LinearLayout>
     </LinearLayout>
 </RelativeLayout>

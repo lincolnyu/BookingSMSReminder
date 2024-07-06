@@ -1,4 +1,6 @@
 ﻿using Android.Content;
+using Android.Database;
+using Android.Provider;
 
 namespace BookingSMSReminder
 {
@@ -31,6 +33,34 @@ namespace BookingSMSReminder
             });
 
             builder.Show();
+        }
+
+        public static int? GetKmpCalendarId(Context context)
+        {
+            var calendarsUri = CalendarContract.Calendars.ContentUri;
+
+            string[] calendarsProjection = {
+                CalendarContract.Calendars.InterfaceConsts.Id,
+                CalendarContract.Calendars.InterfaceConsts.CalendarDisplayName,
+                CalendarContract.Calendars.InterfaceConsts.AccountName
+            };
+
+            var loader = new CursorLoader(context, calendarsUri, calendarsProjection, null, null, null);
+            var cursor = (ICursor)loader.LoadInBackground();
+
+            int? kmpCalId = null;
+            bool moveSucceeded = false;
+            for (moveSucceeded = cursor.MoveToFirst(); moveSucceeded; moveSucceeded = cursor.MoveToNext())
+            {
+                int calId = cursor.GetInt(cursor.GetColumnIndex(calendarsProjection[0]));
+                string calDisplayName = cursor.GetString(cursor.GetColumnIndex(calendarsProjection[1]));
+                string calAccountName = cursor.GetString(cursor.GetColumnIndex(calendarsProjection[2]));
+                if (calAccountName == "kineticmobilept@gmail.com" && calDisplayName == "kineticmobilept@gmail.com")
+                {
+                    return calId;
+                }
+            }
+            return null;
         }
     }
 }

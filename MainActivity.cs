@@ -344,30 +344,7 @@ namespace BookingSMSReminder
         {
             //https://learn.microsoft.com/en-gb/previous-versions/xamarin/android/user-interface/controls/calendar
 
-            var calendarsUri = CalendarContract.Calendars.ContentUri;
-
-            string[] calendarsProjection = {
-                CalendarContract.Calendars.InterfaceConsts.Id,
-                CalendarContract.Calendars.InterfaceConsts.CalendarDisplayName,
-                CalendarContract.Calendars.InterfaceConsts.AccountName
-            };
-
-            var loader = new CursorLoader(this, calendarsUri, calendarsProjection, null, null, null);
-            var cursor = (ICursor)loader.LoadInBackground();
-
-            int? kmpCalId = null;
-            bool moveSucceeded = false;
-            for (moveSucceeded = cursor.MoveToFirst(); moveSucceeded; moveSucceeded = cursor.MoveToNext())
-            {
-                int calId = cursor.GetInt(cursor.GetColumnIndex(calendarsProjection[0]));
-                string calDisplayName = cursor.GetString(cursor.GetColumnIndex(calendarsProjection[1]));
-                string calAccountName = cursor.GetString(cursor.GetColumnIndex(calendarsProjection[2]));
-                if (calAccountName == "kineticmobilept@gmail.com" && calDisplayName == "kineticmobilept@gmail.com")
-                {
-                    kmpCalId = calId;
-                    break;
-                }
-            }
+            var kmpCalId = Utility.GetKmpCalendarId(this);
 
             if (kmpCalId.HasValue)
             {
@@ -383,7 +360,7 @@ namespace BookingSMSReminder
                                     string.Format("calendar_id={0}", kmpCalId.Value), null, "dtstart ASC");
 
                 var eventCursor = (ICursor)eventLoader.LoadInBackground();
-                for (moveSucceeded = eventCursor.MoveToLast(); moveSucceeded; moveSucceeded = eventCursor.MoveToPrevious())
+                for (var moveSucceeded = eventCursor.MoveToLast(); moveSucceeded; moveSucceeded = eventCursor.MoveToPrevious())
                 {
                     var eventTitle = eventCursor.GetString(eventCursor.GetColumnIndex(eventsProjection[1])).Trim();
 

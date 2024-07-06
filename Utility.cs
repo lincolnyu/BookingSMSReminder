@@ -35,6 +35,33 @@ namespace BookingSMSReminder
             builder.Show();
         }
 
+        public static void ShowAlert(Context context, string title, string message, string positiveButtonText, string negativeButtonText, Action? positiveAction, Action? negativeAction, 
+            bool cancellable = true)
+        {
+            // Create a builder object that builds the AlertDialog.
+            var builder = new AlertDialog.Builder(context);
+
+            // Set the message shown for the Alert.
+            builder.SetMessage(message);
+
+            // Set Alert Title.
+            builder.SetTitle(title);
+
+            // Set Cancelable false for when the user clicks on the outside the Dialog Box then it will remain showing.
+            builder.SetCancelable(cancellable);
+
+            // Set the positive button with the specified caption. Lambda OnClickListener doesn't need to do anything.
+            builder.SetPositiveButton(positiveButtonText, (sender, args) => {
+                positiveAction?.Invoke();
+            });
+
+            builder.SetNegativeButton(negativeButtonText, (sender, args) => {
+                negativeAction?.Invoke();
+            });
+
+            builder.Show();
+        }
+
         public static int? GetKmpCalendarId(Context context)
         {
             var calendarsUri = CalendarContract.Calendars.ContentUri;

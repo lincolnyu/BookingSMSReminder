@@ -1,3 +1,5 @@
+#define SUPPRESS_SENDING_SMS
+
 using Android.Content;
 using Android.Database;
 using Android.OS;
@@ -207,6 +209,9 @@ namespace BookingSMSReminder
             var buttonAddBooking = FindViewById<Button>(Resource.Id.button_add_booking);
             buttonAddBooking.Click += ButtonAddBooking_Click;
 
+            var buttonReset = FindViewById<Button>(Resource.Id.button_reset);
+            buttonReset.Click += ButtonReset_Click;
+
             Data.Instance.ReloadContacts(this);
 
             handler_ = new Handler();
@@ -214,7 +219,6 @@ namespace BookingSMSReminder
             StartRepeatingTask();
         }
 
-        
         protected override void OnDestroy()
         {
             base.OnDestroy();
@@ -226,6 +230,11 @@ namespace BookingSMSReminder
         {
             base.OnResume();
 
+            RefreshAll();
+        }
+
+        private void RefreshAll()
+        {
             Data.Instance.ReloadContacts(this);
             RefreshReminders();
         }
@@ -255,6 +264,18 @@ namespace BookingSMSReminder
             }
         }
 
+        private void ButtonReset_Click(object? sender, EventArgs e)
+        {
+            Utility.ShowAlert(this, "Resetting Sent Messages Log", "Are you sure you want to reset the Sent Messages Log?", "Yes", "No", 
+                () => {
+                var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+                var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");
+                File.Delete(sentMessagesDataFile);
+
+                RefreshAll();
+            }, null, true);
+        }
+
         private void ButtonAddBooking_Click(object? sender, EventArgs e)
         {
             Intent switchActivityIntent = new Intent(this, typeof(AddBookingActivity));
@@ -269,8 +290,10 @@ namespace BookingSMSReminder
             {
                 if (reminder.ToSend)
                 {
+                    // Define the precompiler to disable SMS for debugging.
+#if !SUPPRESS_SENDING_SMS
                     SendMessage(reminder.PhoneNumber, reminder.Message);
-
+#endif
                     c++;
                     persons.Add(reminder.Name);
                     CleanUpSentMessageDataFileAndAddNewEntry((reminder.Contact, reminder.StartTime!.Value));
@@ -338,8 +361,6 @@ namespace BookingSMSReminder
             smsManager.SendTextMessage(phone, null, message, sentPI, null);
         }
 
-        
-        
         private IEnumerable<Reminder> GenerateReminders()
         {
             //https://learn.microsoft.com/en-gb/previous-versions/xamarin/android/user-interface/controls/calendar

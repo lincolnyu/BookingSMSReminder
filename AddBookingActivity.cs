@@ -3,6 +3,7 @@ using Android.Provider;
 using Java.Lang;
 using Java.Text;
 using Java.Util;
+using System.Numerics;
 using static Android.Provider.CalendarContract;
 
 namespace BookingSMSReminder
@@ -42,6 +43,18 @@ namespace BookingSMSReminder
 
             var editTime = FindViewById<EditText>(Resource.Id.appt_time);
             editTime.Click += EditTime_Click;
+
+            var checkAddDirectly = FindViewById<CheckBox>(Resource.Id.add_directly);
+            var addDirectlyStr = Config.Instance.GetValue("add_booking_directly");
+            var addDirectly = addDirectlyStr != "0";
+            checkAddDirectly.Checked = addDirectly;
+
+            checkAddDirectly.CheckedChange += CheckAddDirectly_CheckedChange;
+        }
+
+        private void CheckAddDirectly_CheckedChange(object? sender, CompoundButton.CheckedChangeEventArgs e)
+        {
+            Config.Instance.SetValue("add_booking_directly", e.IsChecked ? "1" : "0");
         }
 
         protected override void OnResume()

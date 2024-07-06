@@ -1,5 +1,3 @@
-#define SUPPRESS_SENDING_SMS
-
 using Android.Content;
 using Android.Database;
 using Android.OS;

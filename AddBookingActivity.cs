@@ -1,10 +1,7 @@
 ﻿using Android.Content;
 using Android.Provider;
-using Java.Lang;
 using Java.Text;
 using Java.Util;
-using System.Numerics;
-using static Android.Provider.CalendarContract;
 
 namespace BookingSMSReminder
 {

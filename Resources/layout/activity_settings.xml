@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:orientation="vertical"
+        android:minWidth="25px"
+        android:minHeight="25px"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent">
+
+        <Button
+            android:text="Back to Main"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_settings_back_to_main"
+            android:layout_alignParentLeft="true" />
+
+        <TextView
+            android:text="Reminding"
+            android:textSize="80px"
+            android:textStyle="italic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <Button
+            android:text="Reset Sent Messages Log"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_reset_sent_messages_log" 
+            android:layout_alignParentLeft="true" />
+
+        <TextView
+            android:text="Daily Notification Time"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+          <EditText
+            android:id="@+id/edit_notification_time"
+            android:clickable="false" 
+            android:cursorVisible="false" 
+            android:focusable="false" 
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" /> 
+    </LinearLayout>
+</RelativeLayout>

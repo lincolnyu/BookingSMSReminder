@@ -35,7 +35,7 @@ namespace BookingSMSReminder
             builder.Show();
         }
 
-        public static void ShowAlert(Context context, string title, string message, string positiveButtonText, string negativeButtonText, Action? positiveAction, Action? negativeAction, 
+        public static void ShowAlert(Context context, string title, string message, string positiveButtonText, string negativeButtonText, Action? positiveAction, Action? negativeAction,
             bool cancellable = true)
         {
             // Create a builder object that builds the AlertDialog.
@@ -88,6 +88,22 @@ namespace BookingSMSReminder
                 }
             }
             return null;
+        }
+
+        public static readonly TimeOnly DefaultNotificationTime = new TimeOnly(20, 30);
+
+        public static TimeOnly GetDailyNotificationTime(TimeOnly? defaultTime = null)
+        {
+            var notificationTimeStr = Config.Instance.GetValue("daily_notification_time");
+            TimeOnly? notificationTime = null;
+            if (notificationTimeStr != null)
+            {
+                if (TimeOnly.TryParse(notificationTimeStr, out var nt))
+                {
+                    return nt;
+                }
+            }
+            return defaultTime ?? DefaultNotificationTime;
         }
     }
 }

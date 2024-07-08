@@ -12,6 +12,12 @@
         android:layout_height="fill_parent"
         android:layout_toLeftOf="@id/button_select_all"
         android:id="@+id/linearLayout1">
+        <Button
+            android:text="Settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_settings"
+            android:layout_alignParentLeft="true"/>
         <TextView
             android:text="Booking"
             android:textSize="80px"
@@ -33,17 +39,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
       
-        <LinearLayout
-            android:orientation="horizontal"
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content">
-            <Button
-                android:text="Reset Sent Messages Log"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/button_reset" 
-                android:layout_alignParentLeft="true" />
-        </LinearLayout>
         <RelativeLayout
             android:orientation="horizontal"
             android:layout_width="fill_parent"

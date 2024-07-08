@@ -148,7 +148,8 @@ namespace BookingSMSReminder
                 {
                     long delayMs = 0;
                     // TODO assign delay MS
-                    var dailyRunTime = context_.DailyRunTime;
+
+                    var dailyRunTime = Utility.GetDailyNotificationTime().ToTimeSpan();
                     var currentTime = DateTime.Now;
                     if (currentTime.TimeOfDay < dailyRunTime)
                     {
@@ -176,8 +177,6 @@ namespace BookingSMSReminder
 
         private Handler handler_;
         private ReminderChecker reminderChecker_;
-
-        public TimeSpan DailyRunTime = new TimeSpan(22, 28, 0);
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -207,8 +206,8 @@ namespace BookingSMSReminder
             var buttonAddBooking = FindViewById<Button>(Resource.Id.button_add_booking);
             buttonAddBooking.Click += ButtonAddBooking_Click;
 
-            var buttonReset = FindViewById<Button>(Resource.Id.button_reset);
-            buttonReset.Click += ButtonReset_Click;
+            var buttonSettings = FindViewById<Button>(Resource.Id.button_settings);
+            buttonSettings.Click += ButtonSettings_Click;
 
             Data.Instance.ReloadContacts(this);
 
@@ -217,6 +216,7 @@ namespace BookingSMSReminder
             StartRepeatingTask();
         }
 
+        
         protected override void OnDestroy()
         {
             base.OnDestroy();
@@ -231,7 +231,7 @@ namespace BookingSMSReminder
             RefreshAll();
         }
 
-        private void RefreshAll()
+        public void RefreshAll()
         {
             Data.Instance.ReloadContacts(this);
             RefreshReminders();
@@ -262,21 +262,15 @@ namespace BookingSMSReminder
             }
         }
 
-        private void ButtonReset_Click(object? sender, EventArgs e)
-        {
-            Utility.ShowAlert(this, "Resetting Sent Messages Log", "Are you sure you want to reset the Sent Messages Log?", "Yes", "No", 
-                () => {
-                var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-                var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");
-                File.Delete(sentMessagesDataFile);
-
-                RefreshAll();
-            }, null, true);
-        }
-
         private void ButtonAddBooking_Click(object? sender, EventArgs e)
         {
             Intent switchActivityIntent = new Intent(this, typeof(AddBookingActivity));
+            StartActivity(switchActivityIntent);
+        }
+
+        private void ButtonSettings_Click(object? sender, EventArgs e)
+        {
+            var switchActivityIntent = new Intent(this, typeof(SettingsActivity));
             StartActivity(switchActivityIntent);
         }
 
@@ -555,20 +549,6 @@ namespace BookingSMSReminder
         private bool IsDatePastForReminding(DateTime dtStart)
         {
             return dtStart.Date - DateTime.Now.Date < TimeSpan.FromDays(1);
-        }
-
-        private void SetUpDailyAlarm()
-        {
-            Calendar calendar = Calendar.Instance;
-
-            calendar.Set(CalendarField.HourOfDay, 21);
-            calendar.Set(CalendarField.Minute, 0);
-            calendar.Set(CalendarField.Second, 0);
-
-            PendingIntent pi = PendingIntent.GetService(this, 0,
-            new Intent(this, typeof(MainActivity)), PendingIntentFlags.UpdateCurrent);
-            AlarmManager am = (AlarmManager)GetSystemService(Context.AlarmService);
-            am.SetRepeating(AlarmType.RtcWakeup, calendar.TimeInMillis, AlarmManager.IntervalDay, pi);
         }
     }
 }

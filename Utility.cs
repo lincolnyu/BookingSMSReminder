@@ -14,7 +14,7 @@ namespace BookingSMSReminder
             return $"{hour}:{minute:00}{ampm}";
         }
 
-        public static void ShowAlert(Context context, string title, string message, string okButtonText)
+        public static void ShowAlert(Context context, string title, string message, string okButtonText, Action? action = null)
         {
             // Create a builder object that builds the AlertDialog.
             var builder = new AlertDialog.Builder(context);
@@ -30,6 +30,7 @@ namespace BookingSMSReminder
 
             // Set the positive button with the specified caption. Lambda OnClickListener doesn't need to do anything.
             builder.SetPositiveButton(okButtonText, (sender, args) => {
+                action?.Invoke();
             });
 
             builder.Show();

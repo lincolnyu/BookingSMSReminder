@@ -1,10 +1,10 @@
+using Android;
 using Android.Content;
 using Android.Database;
 using Android.OS;
 using Android.Provider;
 using Android.Telephony;
 using Android.Views;
-using Java.Util;
 
 namespace BookingSMSReminder
 {
@@ -178,12 +178,19 @@ namespace BookingSMSReminder
         private Handler handler_;
         private ReminderChecker reminderChecker_;
 
+        private bool initialized_ = false;
+
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
 
             // Set our view from the "main" layout resource
             SetContentView(Resource.Layout.activity_main);
+
+            if (!CheckPermissions())
+            {
+                return;
+            }
 
             CleanUpSentMessageDataFileAndAddNewEntry(null);
 
@@ -214,21 +221,62 @@ namespace BookingSMSReminder
             handler_ = new Handler();
 
             StartRepeatingTask();
+
+            initialized_ = true;
         }
 
-        
+        private bool CheckPermissions()
+        {
+            var ungranted = new List<string>();
+            if (CheckSelfPermission(Manifest.Permission.ReadCalendar) != Android.Content.PM.Permission.Granted)
+            {
+                ungranted.Add("Read Calendar");
+            }
+
+            if (CheckSelfPermission(Manifest.Permission.ReadContacts) != Android.Content.PM.Permission.Granted)
+            {
+                ungranted.Add("Read Contacts");
+            }
+
+            if (CheckSelfPermission(Manifest.Permission.PostNotifications) != Android.Content.PM.Permission.Granted)
+            {
+                ungranted.Add("Post Notifications");
+            }
+
+            if (CheckSelfPermission(Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
+            {
+                ungranted.Add("Send SMS");
+            }
+
+            if (ungranted.Count > 0)
+            {
+                Utility.ShowAlert(this, "Ungranted Permissions", $"Grant the following permissions and then relaunch the app.\n{string.Join('\n', ungranted)}", "OK", () =>
+                {
+                    FinishAffinity();
+                });
+                return false;
+            }
+            return true;
+        }
+
         protected override void OnDestroy()
         {
             base.OnDestroy();
 
-            StopRepeatingTask();
+            if (initialized_)
+            {
+                StopRepeatingTask();
+            }
         }
 
         protected override void OnResume()
         {
             base.OnResume();
 
-            RefreshAll();
+            if (initialized_)
+            {
+                RefreshAll();
+            }
         }
 
         public void RefreshAll()

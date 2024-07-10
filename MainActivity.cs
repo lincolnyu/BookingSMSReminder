@@ -17,6 +17,7 @@ namespace BookingSMSReminder
 
             public bool Enabled;
             public string? Name;
+            public string? NameInCalendar;
             public string? PhoneNumber;
             public string Message;
 
@@ -25,7 +26,8 @@ namespace BookingSMSReminder
 
             public override string ToString()
             {
-                return Enabled ? $"[{Name}, {PhoneNumber}] {Message}" : Message;
+                var nameStr = NameInCalendar != null ? $"{NameInCalendar}->{Name}" : Name;
+                return Enabled ? $"[{nameStr}, {PhoneNumber}] {Message}" : Message;
             }
         }
 
@@ -488,11 +490,14 @@ namespace BookingSMSReminder
                                         practionerAndCompany = $" at {company}";
                                     }
 
+
+                                    string? nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
                                     yield return new Reminder
                                     {
                                         Enabled = true,
                                         ToSend = false, // Sending not enabled by default to avoid being sent inadvertently.
                                         Name = contact.DisplayName,
+                                        NameInCalendar = nameInCalendar,
                                         PhoneNumber = contact.MostLikelyNumber,
                                         Message = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
                                         Contact = contact,

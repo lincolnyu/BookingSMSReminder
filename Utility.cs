@@ -118,17 +118,23 @@ namespace BookingSMSReminder
                 return exactMatch;
             }
 
+            var nameSplit = nameLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
             var foundMatches = new List<Contact>();
             foreach (var contact in Data.Instance.Contacts.Values)
             {
-                var split = contact.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var s in split)
+                var split = contact.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(x=>x.ToLower());
+                var match = true;
+                foreach (var s in nameSplit)
                 {
-                    if (nameLower == s.ToLower())
+                    if (!split.Contains(s))
                     {
-                        foundMatches.Add(contact);
-                        break;
+                        match = false;
                     }
+                }
+                if (match)
+                {
+                    foundMatches.Add(contact);
                 }
             }
             if (foundMatches.Count == 1)

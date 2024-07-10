@@ -276,13 +276,26 @@ namespace BookingSMSReminder
             if (initialized_)
             {
                 RefreshAll();
+                ValidateSettings();
             }
         }
 
         public void RefreshAll()
         {
             Data.Instance.ReloadContacts(this);
+
             RefreshReminders();
+        }
+
+        private void ValidateSettings()
+        {
+            var practioner = Config.Instance.GetValue("practitioner_name");
+            var company = Config.Instance.GetValue("organization_name");
+
+            if (string.IsNullOrWhiteSpace(practioner) && string.IsNullOrWhiteSpace(company))
+            {
+                Utility.ShowAlert(this, "Settings Error", "Neither practitioner nor organization have been specified in Settings.", "OK");
+            }
         }
 
         private void StartRepeatingTask()
@@ -451,13 +464,30 @@ namespace BookingSMSReminder
                             {
                                 if (contact.MostLikelyNumber != null)
                                 {
+                                    var practioner = Config.Instance.GetValue("practioner_name");
+                                    var company = Config.Instance.GetValue("organization_name");
+
+                                    string practionerAndCompany = "";
+                                    if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
+                                    {
+                                        practionerAndCompany = $" with {practioner} at {company}";
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(practioner))
+                                    {
+                                        practionerAndCompany = $" with {practioner}";
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(company))
+                                    {
+                                        practionerAndCompany = $" with {practioner}";
+                                    }
+
                                     yield return new Reminder
                                     {
                                         Enabled = true,
                                         ToSend = true,
                                         Name = contact.DisplayName,
                                         PhoneNumber = contact.MostLikelyNumber,
-                                        Message = $"Appointment reminder for {PrintDateTime(dtStart)} with Cibo Cai at Kinetic Mobile Physio. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
+                                        Message = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
                                         Contact = contact,
                                         StartTime = dtStart
                                     };

@@ -21,6 +21,17 @@ namespace BookingSMSReminder
             var editNotificationTime = FindViewById<EditText>(Resource.Id.edit_notification_time);
             editNotificationTime.Click += EditNotificationTime_Click;
             UpdateEditTime();
+
+            UpdatePractitionerName();
+
+            UpdateOrganizationName();
+        }
+
+        protected override void OnPause()
+        {
+            base.OnPause();
+
+            UpdateEditTextsToConfig();
         }
 
         private void ButtonBackToMain_Click(object? sender, EventArgs e)
@@ -64,6 +75,29 @@ namespace BookingSMSReminder
             var editText = FindViewById<EditText>(Resource.Id.edit_notification_time);
             var notificationTime = Utility.GetDailyNotificationTime();
             editText.Text = Utility.PrintTime(notificationTime.Hour, notificationTime.Minute);
+        }
+
+        private void UpdatePractitionerName()
+        {
+            var editText = FindViewById<EditText>(Resource.Id.edit_practitioner_name);
+            var practitionerName = Config.Instance.GetValue("practitioner_name");
+            editText.Text = practitionerName ?? "";
+        }
+
+        private void UpdateOrganizationName()
+        {
+            var editText = FindViewById<EditText>(Resource.Id.edit_organization_name);
+            var organizationName = Config.Instance.GetValue("organization_name");
+            editText.Text = organizationName ?? "";
+        }
+
+        private void UpdateEditTextsToConfig()
+        {
+            var editPractionerName = FindViewById<EditText>(Resource.Id.edit_practitioner_name);
+            Config.Instance.SetValue("practitioner_name", editPractionerName.Text.Trim());
+
+            var editOrganizationName = FindViewById<EditText>(Resource.Id.edit_organization_name);
+            Config.Instance.SetValue("organization_name", editOrganizationName.Text.Trim());
         }
     }
 }

@@ -485,7 +485,7 @@ namespace BookingSMSReminder
                                     yield return new Reminder
                                     {
                                         Enabled = true,
-                                        ToSend = true,
+                                        ToSend = false, // Sending not enabled by default to avoid being sent inadvertently.
                                         Name = contact.DisplayName,
                                         PhoneNumber = contact.MostLikelyNumber,
                                         Message = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",

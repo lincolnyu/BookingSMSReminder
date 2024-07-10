@@ -227,34 +227,40 @@ namespace BookingSMSReminder
 
         private bool CheckPermissions()
         {
-            var ungranted = new List<string>();
+            var ungrantedMandatory = new List<string>();
+            var ungrantedOptional = new List<string>();
             if (CheckSelfPermission(Manifest.Permission.ReadCalendar) != Android.Content.PM.Permission.Granted)
             {
-                ungranted.Add("Read Calendar");
+                ungrantedMandatory.Add("Read Calendar");
             }
 
             if (CheckSelfPermission(Manifest.Permission.ReadContacts) != Android.Content.PM.Permission.Granted)
             {
-                ungranted.Add("Read Contacts");
+                ungrantedMandatory.Add("Read Contacts");
             }
 
             if (CheckSelfPermission(Manifest.Permission.PostNotifications) != Android.Content.PM.Permission.Granted)
             {
-                ungranted.Add("Post Notifications");
+                ungrantedOptional.Add("Post Notifications");
             }
 
             if (CheckSelfPermission(Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
             {
-                ungranted.Add("Send SMS");
+                ungrantedMandatory.Add("Send SMS");
             }
 
-            if (ungranted.Count > 0)
+            if (ungrantedMandatory.Count > 0)
             {
-                Utility.ShowAlert(this, "Ungranted Permissions", $"Grant the following permissions and then relaunch the app.\n{string.Join('\n', ungranted)}", "OK", () =>
+                Utility.ShowAlert(this, "Error: Ungranted Permissions", $"Grant the following permissions and then relaunch the app.\n{string.Join('\n', ungrantedMandatory)}", "OK", () =>
                 {
                     FinishAffinity();
                 });
                 return false;
+            }
+
+            if (ungrantedOptional.Count > 0)
+            {
+                Utility.ShowAlert(this, "Warning: Ungranted Permissions", $"The following optional permissions are not granted.\n{string.Join('\n', ungrantedOptional)}", "OK");
             }
             return true;
         }

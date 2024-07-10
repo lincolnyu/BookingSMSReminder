@@ -1,6 +1,9 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
+using Org.Apache.Http.Client.Params;
+using System.Globalization;
+using static BookingSMSReminder.Data;
 
 namespace BookingSMSReminder
 {
@@ -105,6 +108,34 @@ namespace BookingSMSReminder
                 }
             }
             return defaultTime ?? DefaultNotificationTime;
+        }
+
+        public static Contact? SmartFindContact(string name)
+        {
+            var nameLower = name.ToLower();
+            if (Data.Instance.Contacts.TryGetValue(nameLower, out var exactMatch))
+            {
+                return exactMatch;
+            }
+
+            var foundMatches = new List<Contact>();
+            foreach (var contact in Data.Instance.Contacts.Values)
+            {
+                var split = contact.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var s in split)
+                {
+                    if (nameLower == s.ToLower())
+                    {
+                        foundMatches.Add(contact);
+                        break;
+                    }
+                }
+            }
+            if (foundMatches.Count == 1)
+            {
+                return foundMatches[0];
+            }
+            return null;
         }
     }
 }

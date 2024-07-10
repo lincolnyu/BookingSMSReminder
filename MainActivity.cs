@@ -458,7 +458,8 @@ namespace BookingSMSReminder
                             clientName = clientName[..index].Trim();
                         }
 
-                        if (Data.Instance.Contacts.TryGetValue(clientName.ToLower(), out var contact))
+                        var contact = Utility.SmartFindContact(clientName);
+                        if (contact != null)
                         {
                             if (!GetIfMessageSent(contact, dtStart))
                             {

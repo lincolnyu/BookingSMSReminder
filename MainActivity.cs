@@ -464,7 +464,7 @@ namespace BookingSMSReminder
                             {
                                 if (contact.MostLikelyNumber != null)
                                 {
-                                    var practioner = Config.Instance.GetValue("practioner_name");
+                                    var practioner = Config.Instance.GetValue("practitioner_name");
                                     var company = Config.Instance.GetValue("organization_name");
 
                                     string practionerAndCompany = "";

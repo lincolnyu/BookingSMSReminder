@@ -478,7 +478,7 @@ namespace BookingSMSReminder
                                     }
                                     else if (!string.IsNullOrWhiteSpace(company))
                                     {
-                                        practionerAndCompany = $" with {practioner}";
+                                        practionerAndCompany = $" at {company}";
                                     }
 
                                     yield return new Reminder

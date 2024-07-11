@@ -512,7 +512,7 @@ namespace BookingSMSReminder
                                         ToSend = false,
                                         Name = contact.DisplayName,
                                         PhoneNumber = contact.MostLikelyNumber,
-                                        Message = $"ERROR: Unable to send message to {clientName} with an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.",
+                                        Message = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.",
                                         Contact = contact,
                                         StartTime = dtStart
                                     };
@@ -539,7 +539,7 @@ namespace BookingSMSReminder
                                 Enabled = false,
                                 ToSend = false,
                                 Name = clientName,
-                                Message = $"ERROR: Unable to find contact detail for {clientName} with an appointment at {dtStart.ToShortTimeString()} on {dtStart.ToLongDateString()}. This reminder needs to be manually handled."
+                                Message = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled."
                             };
                         }
                     }

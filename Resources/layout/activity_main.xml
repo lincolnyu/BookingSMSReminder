@@ -44,21 +44,32 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content">
             <LinearLayout
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content">
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content">
+                    <Button
+                        android:text="Select All"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/button_select_all" 
+                        android:layout_alignParentLeft="true" />
+                    <Button
+                        android:text="Select None"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/button_select_none" 
+                        android:layout_alignParentLeft="true" />
+                </LinearLayout>
                 <Button
-                    android:text="Select All"
+                    android:text="Dismiss Selected"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:id="@+id/button_select_all" 
-                    android:layout_alignParentLeft="true" />
-                <Button
-                    android:text="Select None"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:id="@+id/button_select_none" 
-                    android:layout_alignParentLeft="true" />
+                    android:id="@+id/button_dismiss_selected" 
+                    android:layout_alignParentRight="true" />
             </LinearLayout>
             <Button
                 android:text="Send Selected"

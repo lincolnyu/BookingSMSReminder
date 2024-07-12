@@ -1,9 +1,10 @@
+#define SUPPRESS_SENDING_SMS
+
 using Android;
 using Android.Content;
 using Android.Database;
 using Android.OS;
 using Android.Provider;
-using Android.Telephony;
 using Android.Views;
 
 namespace BookingSMSReminder
@@ -13,9 +14,18 @@ namespace BookingSMSReminder
     {
         class Reminder
         {
-            public bool ToSend;
+            public bool Selected;
 
-            public bool Enabled;
+            public enum StatusEnum
+            {
+                Pending,
+                Error,
+                Sent,
+                Dismissed
+            }
+
+            public StatusEnum Status;
+
             public string? Name;
             public string? NameInCalendar;
             public string? PhoneNumber;
@@ -27,7 +37,7 @@ namespace BookingSMSReminder
             public override string ToString()
             {
                 var nameStr = NameInCalendar != null ? $"{NameInCalendar}->{Name}" : Name;
-                return Enabled ? $"[{nameStr}, {PhoneNumber}] {Message}" : Message;
+                return Status == StatusEnum.Pending ? $"[{nameStr}, {PhoneNumber}] {Message}" : Message;
             }
         }
 
@@ -72,7 +82,7 @@ namespace BookingSMSReminder
 
                 public void OnCheckedChanged(CompoundButton? buttonView, bool isChecked)
                 {
-                    reminder_.ToSend = isChecked;
+                    reminder_.Selected = isChecked;
                 }
             }
 
@@ -84,30 +94,30 @@ namespace BookingSMSReminder
                 {
                     convertView = inflater_.Inflate(Resource.Layout.activity_custom_row, null);
 
-                    CheckBox cb1 = convertView.FindViewById<CheckBox>(Resource.Id.to_send);
+                    CheckBox cb1 = convertView.FindViewById<CheckBox>(Resource.Id.selected);
 
                     holder = new ViewHolder();
                     holder.CheckBox = cb1;
                     convertView.Tag = holder;
-
-                    holder.CheckBox.SetOnCheckedChangeListener(new CheckedChangeListener(reminders_[position]));
                 }
                 else
                 {
                     holder = (ViewHolder)convertView.Tag;
                 }
 
+                holder.CheckBox.SetOnCheckedChangeListener(new CheckedChangeListener(reminders_[position]));
+
                 var reminder = reminders_[position];
 
                 TextView tv = convertView.FindViewById<TextView>(Resource.Id.message);
                 tv.Text = reminder.ToString();
 
-                CheckBox cb = convertView.FindViewById<CheckBox>(Resource.Id.to_send);
+                CheckBox cb = convertView.FindViewById<CheckBox>(Resource.Id.selected);
 
-                if (reminder.Enabled)
+                if (reminder.Status == Reminder.StatusEnum.Pending)
                 {
                     cb.Enabled = true;
-                    cb.Checked = reminder.ToSend;
+                    cb.Checked = reminder.Selected;
                 }
                 else
                 {
@@ -129,7 +139,7 @@ namespace BookingSMSReminder
             {
                 context_ = context;
 
-                var newThread = new Thread(new ThreadStart(Run));
+                var newThread = new System.Threading.Thread(new ThreadStart(Run));
                 newThread.Start();
             }
 
@@ -172,6 +182,130 @@ namespace BookingSMSReminder
             }
         }
 
+        class ProcessedRemindersLog
+        {
+            public string LogFileName { get; }
+
+
+            private Dictionary<string, List<DateTime>> cache_ = new Dictionary<string, List<DateTime>>();
+            private bool cacheInvalid_ = true;
+
+            public ProcessedRemindersLog(string logFileName)
+            {
+                LogFileName = logFileName;
+                cacheInvalid_ = true;
+            }
+
+            private void ReCacheIfNeeded()
+            {
+                lock (this)
+                {
+                    if (!cacheInvalid_) return;
+
+                    var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+                    var logFile = Path.Combine(appDataPath, LogFileName);
+                    if (File.Exists(logFile))
+                    {
+                        using var sr = new StreamReader(logFile);
+                        while (!sr.EndOfStream)
+                        {
+                            var line = sr.ReadLine();
+                            if (string.IsNullOrEmpty(line)) continue;
+                            var segs = line.Split('|');
+                            if (segs.Length != 2) continue;
+                            var number = segs[0];
+                            var stt = DateTime.Parse(segs[1]);
+                            if (!cache_.TryGetValue(number, out var dates))
+                            {
+                                dates = new List<DateTime>();
+                                cache_.Add(number, dates);
+                            }
+                            dates.Add(stt);
+                        }
+                    }
+
+                    cacheInvalid_ = false;
+                }
+            }
+
+            public static bool IsDatePastForReminding(DateTime dtStart)
+            {
+                return dtStart.Date - DateTime.Now.Date < TimeSpan.FromDays(1);
+            }
+
+            public bool GetIfMessageLogged(Data.Contact contact, DateTime startTime)
+            {
+                ReCacheIfNeeded();
+
+                if (!cache_.TryGetValue(contact.MostLikelyNumber, out var startDates))
+                {
+                    return false;
+                }
+                
+                foreach (var stt in startDates)
+                {
+                    if (stt == startTime)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            public void CleanUpLogAndAddNewEntry((Data.Contact, DateTime)? newEntry)
+            {
+                lock (this)
+                {
+                    var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+                    var logFile = Path.Combine(appDataPath, LogFileName);
+                    bool newEntryAlreadyExists = false;
+                    var lines = new List<string>();
+                    if (File.Exists(logFile))
+                    {
+                        {
+                            using var sr = new StreamReader(logFile);
+                            while (!sr.EndOfStream)
+                            {
+                                var line = sr.ReadLine();
+                                if (string.IsNullOrEmpty(line)) continue;
+                                var segs = line.Split('|');
+                                if (segs.Length != 2) continue;
+                                var stt = DateTime.Parse(segs[1]);
+                                if (!IsDatePastForReminding(stt))
+                                {
+                                    lines.Add(line);
+                                    if (newEntry != null)
+                                    {
+                                        if (segs[0] == newEntry.Value.Item1.MostLikelyNumber && stt == newEntry.Value.Item2)
+                                        {
+                                            newEntryAlreadyExists = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    {
+                        using var sw = new StreamWriter(logFile);
+                        foreach (var line in lines)
+                        {
+                            sw.WriteLine(line);
+                        }
+                        if (newEntry.HasValue && !newEntryAlreadyExists)
+                        {
+                            sw.WriteLine($"{newEntry.Value.Item1.MostLikelyNumber}|{newEntry.Value.Item2}");
+                        }
+                    }
+
+                    cacheInvalid_ = true;
+                }
+            }
+        }
+
+
+        private ProcessedRemindersLog sentRemindersLog_ = new ProcessedRemindersLog("sent_reminders.log");
+        private ProcessedRemindersLog dismissedRemindersLog_ = new ProcessedRemindersLog("dismissed_reminders.log");
+
         private ListView? listViewReminders_;
 
         private ReminderAdapter remindersAdapter_;
@@ -194,7 +328,8 @@ namespace BookingSMSReminder
                 return;
             }
 
-            CleanUpSentMessageDataFileAndAddNewEntry(null);
+            sentRemindersLog_.CleanUpLogAndAddNewEntry(null);
+            dismissedRemindersLog_.CleanUpLogAndAddNewEntry(null);
 
             listViewReminders_ = FindViewById<ListView>(Resource.Id.listview_reminders);
 
@@ -211,6 +346,9 @@ namespace BookingSMSReminder
 
             var buttonSendSelected = FindViewById<Button>(Resource.Id.button_send_selected);
             buttonSendSelected.Click += ButtonSendSelected_Click;
+
+            var buttonDismissSelected = FindViewById<Button>(Resource.Id.button_dismiss_selected);
+            buttonDismissSelected.Click += ButtonDismissSelected_Click;
 
             var buttonAddBooking = FindViewById<Button>(Resource.Id.button_add_booking);
             buttonAddBooking.Click += ButtonAddBooking_Click;
@@ -283,8 +421,8 @@ namespace BookingSMSReminder
 
             if (initialized_)
             {
-                RefreshAll();
                 ValidateSettings();
+                RefreshAll();
             }
         }
 
@@ -343,45 +481,63 @@ namespace BookingSMSReminder
             StartActivity(switchActivityIntent);
         }
 
+        private void ButtonDismissSelected_Click(object? sender, EventArgs e)
+        {
+            Utility.ShowAlert(this, "Dismissing Reminders", "Are you sure you want to dismiss the selected reminders?", "Yes", "No", () =>
+            {
+                foreach (var reminder in reminders_)
+                {
+                    if (reminder.Selected)
+                    {
+                        dismissedRemindersLog_.CleanUpLogAndAddNewEntry((reminder.Contact, reminder.StartTime!.Value));
+                    }
+                }
+
+                RefreshReminders();
+            }, null);
+        }
+
         private void ButtonSendSelected_Click(object? sender, EventArgs e)
         {
-            var persons = new List<string>();
-            var c = 0;
-            foreach (var reminder in reminders_)
+            Utility.ShowAlert(this, "Sending Reminders", "Are you sure you want to send off the selected reminders?", "Yes", "No", () =>
             {
-                if (reminder.ToSend)
+                var persons = new List<string>();
+                var c = 0;
+
+                foreach (var reminder in reminders_)
                 {
-                    // Define the precompiler to disable SMS for debugging.
-#if !SUPPRESS_SENDING_SMS
-                    SendMessage(reminder.PhoneNumber, reminder.Message);
-#endif
-                    c++;
-                    persons.Add(reminder.Name);
-                    CleanUpSentMessageDataFileAndAddNewEntry((reminder.Contact, reminder.StartTime!.Value));
+                    if (reminder.Selected)
+                    {
+                        SendMessage(reminder.PhoneNumber, reminder.Message);
+                        c++;
+                        persons.Add(reminder.Name);
+
+                        sentRemindersLog_.CleanUpLogAndAddNewEntry((reminder.Contact, reminder.StartTime!.Value));
+                    }
                 }
-            }
 
-            var sb = new System.Text.StringBuilder();
-            if (c > 0)
-            {
-                sb.AppendLine($"Messages have been sent to the following {c} persons:");
-                sb.Append(string.Join(", ", persons));
-                sb.Append(".");
-            }
-            else
-            {
-                sb.AppendLine($"No messages have been sent.");
-            }
-            Utility.ShowAlert(this, "Message Sent", sb.ToString(), "OK");
+                var sb = new System.Text.StringBuilder();
+                if (c > 0)
+                {
+                    sb.AppendLine($"Messages have been sent to the following {c} persons:");
+                    sb.Append(string.Join(", ", persons));
+                    sb.Append(".");
+                }
+                else
+                {
+                    sb.AppendLine($"No messages have been sent.");
+                }
+                Utility.ShowAlert(this, "Messages Sent", sb.ToString(), "OK");
 
-            RefreshReminders();
+                RefreshReminders();
+            }, null);
         }
 
         private void ButtonSelectNone_Click(object? sender, EventArgs e)
         {
             foreach (var reminder in reminders_)
             {
-                reminder.ToSend = false;
+                reminder.Selected = false;
             }
             remindersAdapter_.NotifyDataSetChanged();
         }
@@ -390,9 +546,9 @@ namespace BookingSMSReminder
         {
             foreach (var reminder in reminders_)
             {
-                if (reminder.Enabled)
+                if (reminder.Status == Reminder.StatusEnum.Pending)
                 {
-                    reminder.ToSend = true;
+                    reminder.Selected = true;
                 }
             }
             remindersAdapter_.NotifyDataSetChanged();
@@ -412,6 +568,8 @@ namespace BookingSMSReminder
 
         private void SendMessage(string phone, string message)
         {
+            // Define the precompiler to disable SMS for debugging.
+#if !SUPPRESS_SENDING_SMS
             var smsManager = SmsManager.Default;
 
             PendingIntent sentPI;
@@ -420,6 +578,7 @@ namespace BookingSMSReminder
             sentPI = PendingIntent.GetBroadcast(this, 0, new Intent(SENT), 0);
 
             smsManager.SendTextMessage(phone, null, message, sentPI, null);
+#endif
         }
 
         private IEnumerable<Reminder> GenerateReminders()
@@ -469,7 +628,33 @@ namespace BookingSMSReminder
                         var contact = Utility.SmartFindContact(clientName);
                         if (contact != null)
                         {
-                            if (!GetIfMessageSent(contact, dtStart))
+                            if (dismissedRemindersLog_.GetIfMessageLogged(contact, dtStart))
+                            {
+                                yield return new Reminder
+                                {
+                                    Status = Reminder.StatusEnum.Dismissed,
+                                    Selected = false,
+                                    Name = contact.DisplayName,
+                                    PhoneNumber = contact.MostLikelyNumber,
+                                    Message = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.",
+                                    Contact = contact,
+                                    StartTime = dtStart
+                                };
+                            }
+                            else if (sentRemindersLog_.GetIfMessageLogged(contact, dtStart))
+                            {
+                                yield return new Reminder
+                                {
+                                    Status = Reminder.StatusEnum.Sent,
+                                    Selected = false,
+                                    Name = contact.DisplayName,
+                                    PhoneNumber = contact.MostLikelyNumber,
+                                    Message = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.",
+                                    Contact = contact,
+                                    StartTime = dtStart
+                                };
+                            }
+                            else
                             {
                                 if (contact.MostLikelyNumber != null)
                                 {
@@ -490,12 +675,11 @@ namespace BookingSMSReminder
                                         practionerAndCompany = $" at {company}";
                                     }
 
-
                                     string? nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
                                     yield return new Reminder
                                     {
-                                        Enabled = true,
-                                        ToSend = false, // Sending not enabled by default to avoid being sent inadvertently.
+                                        Status = Reminder.StatusEnum.Pending,
+                                        Selected = false, // Sending not enabled by default to avoid being sent inadvertently.
                                         Name = contact.DisplayName,
                                         NameInCalendar = nameInCalendar,
                                         PhoneNumber = contact.MostLikelyNumber,
@@ -508,8 +692,8 @@ namespace BookingSMSReminder
                                 {
                                     yield return new Reminder
                                     {
-                                        Enabled = false,
-                                        ToSend = false,
+                                        Status = Reminder.StatusEnum.Error,
+                                        Selected = false,
                                         Name = contact.DisplayName,
                                         PhoneNumber = contact.MostLikelyNumber,
                                         Message = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.",
@@ -518,26 +702,13 @@ namespace BookingSMSReminder
                                     };
                                 }
                             }
-                            else
-                            {
-                                yield return new Reminder
-                                {
-                                    Enabled = false,
-                                    ToSend = false,
-                                    Name = contact.DisplayName,
-                                    PhoneNumber = contact.MostLikelyNumber,
-                                    Message = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.",
-                                    Contact = contact,
-                                    StartTime = dtStart
-                                };
-                            }
                         }
                         else
                         {
                             yield return new Reminder
                             {
-                                Enabled = false,
-                                ToSend = false,
+                                Status = Reminder.StatusEnum.Error,
+                                Selected = false,
                                 Name = clientName,
                                 Message = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled."
                             };
@@ -549,96 +720,21 @@ namespace BookingSMSReminder
 
         private string PrintDateTime(DateTime dtStart)
         {
-            string[] Months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
+            string[] Months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             string[] DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
             var timeStr = Utility.PrintTime(dtStart.Hour, dtStart.Minute);
 
             var day = dtStart.Day;
-            var month = Months[dtStart.Month-1];
+            var month = Months[dtStart.Month - 1];
             var year = dtStart.Year;
             var dayOfWeek = DaysOfWeek[(int)dtStart.DayOfWeek];
             return $"{dayOfWeek} {day} {month} {year} @ {timeStr}";
         }
 
-        private bool GetIfMessageSent(Data.Contact contact, DateTime startTime)
-        {
-            var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-            var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");
-            if (!File.Exists(sentMessagesDataFile))
-            {
-                return false;
-            }
-            using var sr = new StreamReader(sentMessagesDataFile);
-            while (!sr.EndOfStream)
-            {
-                var line = sr.ReadLine();
-                if (string.IsNullOrEmpty(line)) continue;
-                var segs = line.Split('|');
-                if (segs.Length != 2) continue;
-                var number = segs[0];
-                var stt = DateTime.Parse(segs[1]);
-                if (number == contact.MostLikelyNumber && stt == startTime)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void CleanUpSentMessageDataFileAndAddNewEntry((Data.Contact, DateTime)? newEntry)
-        {
-            var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-            var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");
-            bool newEntryAlreadyExists = false;
-            var lines = new List<string>();
-            if (File.Exists(sentMessagesDataFile))
-            {
-                {
-                    using var sr = new StreamReader(sentMessagesDataFile);
-                    while (!sr.EndOfStream)
-                    {
-                        var line = sr.ReadLine();
-                        if (string.IsNullOrEmpty(line)) continue;
-                        var segs = line.Split('|');
-                        if (segs.Length != 2) continue;
-                        var stt = DateTime.Parse(segs[1]);
-                        if (!IsDatePastForReminding(stt))
-                        {
-                            lines.Add(line);
-                            if (newEntry != null)
-                            {
-                                if (segs[0] == newEntry.Value.Item1.MostLikelyNumber && stt == newEntry.Value.Item2)
-                                {
-                                    newEntryAlreadyExists = true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            {
-                using var sw = new StreamWriter(sentMessagesDataFile);
-                foreach (var line in lines)
-                {
-                    sw.WriteLine(line);
-                }
-                if (newEntry.HasValue && !newEntryAlreadyExists)
-                {
-                    sw.WriteLine($"{newEntry.Value.Item1.MostLikelyNumber}|{newEntry.Value.Item2}");
-                }
-            }
-
-        }
-
-        private bool IsRemindableStartTime(DateTime dtStart)
+        private static bool IsRemindableStartTime(DateTime dtStart)
         {
             return dtStart.Date - DateTime.Now.Date == TimeSpan.FromDays(1);
-        }
-
-        private bool IsDatePastForReminding(DateTime dtStart)
-        {
-            return dtStart.Date - DateTime.Now.Date < TimeSpan.FromDays(1);
         }
     }
 }

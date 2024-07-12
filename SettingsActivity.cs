@@ -15,8 +15,11 @@ namespace BookingSMSReminder
             var buttonBackToMain = FindViewById<Button>(Resource.Id.button_settings_back_to_main);
             buttonBackToMain.Click += ButtonBackToMain_Click;
 
-            var buttonReset = FindViewById<Button>(Resource.Id.button_reset_sent_messages_log);
-            buttonReset.Click += ButtonResetSentMessagesLog_Click;
+            var buttonResetSent = FindViewById<Button>(Resource.Id.button_reset_sent_reminders_log);
+            buttonResetSent.Click += ButtonResetSentMessagesLog_Click;
+
+            var buttonResetDismissed = FindViewById<Button>(Resource.Id.button_reset_dismissed_reminders_log);
+            buttonResetDismissed.Click += ButtonResetDismissedMessagesLog_Click;
 
             var editNotificationTime = FindViewById<EditText>(Resource.Id.edit_notification_time);
             editNotificationTime.Click += EditNotificationTime_Click;
@@ -27,6 +30,7 @@ namespace BookingSMSReminder
             UpdateOrganizationName();
         }
 
+        
         protected override void OnPause()
         {
             base.OnPause();
@@ -47,14 +51,25 @@ namespace BookingSMSReminder
 
         private void ButtonResetSentMessagesLog_Click(object? sender, EventArgs e)
         {
-            Utility.ShowAlert(this, "Resetting Sent Messages Log", "Are you sure you want to reset the Sent Messages Log?", "Yes", "No",
+            Utility.ShowAlert(this, "Resetting Sent Reminders Log", "Are you sure you want to reset the Sent Reminders Log?", "Yes", "No",
                 () => {
                     var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-                    var sentMessagesDataFile = Path.Combine(appDataPath, "sent_messages.log");
-                    File.Delete(sentMessagesDataFile);
+                    var sentRemindersDataFile = Path.Combine(appDataPath, "sent_reminders.log");
+                    File.Delete(sentRemindersDataFile);
                 }, null, true);
             // Main activity when switched back will call RefreshAll in OnResune()
         }
+
+        private void ButtonResetDismissedMessagesLog_Click(object? sender, EventArgs e)
+        {
+            Utility.ShowAlert(this, "Resetting Dismissed Reminders Log", "Are you sure you want to reset the Dismissed Reminders Log?", "Yes", "No",
+                () => {
+                    var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+                    var dismissedRemindersDataFile = Path.Combine(appDataPath, "dismissed_reminders.log");
+                    File.Delete(dismissedRemindersDataFile);
+                }, null, true);
+        }
+
 
         private void EditNotificationTime_Click(object? sender, EventArgs e)
         {

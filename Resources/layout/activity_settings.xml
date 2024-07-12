@@ -25,13 +25,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
 
-        <Button
-            android:text="Reset Sent Messages Log"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/button_reset_sent_messages_log" 
-            android:layout_alignParentLeft="true" />
-
         <TextView
             android:text="Daily Notification Time"
             android:textSize="60px"
@@ -64,6 +57,26 @@
             android:id="@+id/edit_organization_name"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content" />
+
+
+        <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content">
+            <Button
+                android:text="Reset Sent Reminders Log"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/button_reset_sent_reminders_log" 
+                android:layout_alignParentLeft="true" />
+
+            <Button
+                android:text="Reset Dismissed Reminders Log"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/button_reset_dismissed_reminders_log" 
+                android:layout_alignParentLeft="true" />
+        </LinearLayout>
 
     </LinearLayout>
 </RelativeLayout>

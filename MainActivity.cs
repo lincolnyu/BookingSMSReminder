@@ -237,6 +237,11 @@ namespace BookingSMSReminder
             {
                 ReCacheIfNeeded();
 
+                if (string.IsNullOrWhiteSpace(contact.MostLikelyNumber))
+                {
+                    return false;
+                }
+
                 if (!cache_.TryGetValue(contact.MostLikelyNumber, out var startDates))
                 {
                     return false;

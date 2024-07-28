@@ -17,6 +17,14 @@ namespace BookingSMSReminder
             return $"{hour}:{minute:00}{ampm}";
         }
 
+        public static void CopyToClipboard(this Context context, string text)
+        {
+            ClipboardManager clipboard = (ClipboardManager)context.GetSystemService(Context.ClipboardService);
+            ClipData clip = ClipData.NewPlainText("Copied Text", text);
+            clipboard.PrimaryClip = clip;
+        }
+
+
         public static void ShowAlert(Context context, string title, string message, string okButtonText, Action? action = null)
         {
             // Create a builder object that builds the AlertDialog.

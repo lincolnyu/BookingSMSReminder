@@ -1,11 +1,15 @@
-#define SUPPRESS_SENDING_SMS
+// NOTE Comment/undefine the following define for release
+//#define SUPPRESS_SENDING_SMS
 
 using Android;
 using Android.Content;
 using Android.Database;
 using Android.OS;
 using Android.Provider;
+using Android.Service.QuickAccessWallet;
+using Android.Telephony;
 using Android.Views;
+using static Android.Widget.AdapterView;
 
 namespace BookingSMSReminder
 {
@@ -29,7 +33,8 @@ namespace BookingSMSReminder
             public string? Name;
             public string? NameInCalendar;
             public string? PhoneNumber;
-            public string Message;
+            public string ReminderMessage;
+            public string ReminderStatusDescription;
 
             public Data.Contact? Contact;
             public DateTime? StartTime;
@@ -37,7 +42,7 @@ namespace BookingSMSReminder
             public override string ToString()
             {
                 var nameStr = NameInCalendar != null ? $"{NameInCalendar}->{Name}" : Name;
-                return Status == StatusEnum.Pending ? $"[{nameStr}, {PhoneNumber}] {Message}" : Message;
+                return Status == StatusEnum.Pending ? $"[{nameStr}, {PhoneNumber}] {ReminderMessage}" : ReminderStatusDescription;
             }
         }
 
@@ -99,6 +104,9 @@ namespace BookingSMSReminder
                     holder = new ViewHolder();
                     holder.CheckBox = cb1;
                     convertView.Tag = holder;
+
+                    var layout = inflater_.Inflate(Resource.Layout.activity_custom_row, parent, false);
+                    layout.LongClickable = true;
                 }
                 else
                 {
@@ -237,12 +245,7 @@ namespace BookingSMSReminder
             {
                 ReCacheIfNeeded();
 
-                if (string.IsNullOrWhiteSpace(contact.MostLikelyNumber))
-                {
-                    return false;
-                }
-
-                if (!cache_.TryGetValue(contact.MostLikelyNumber, out var startDates))
+                if (string.IsNullOrWhiteSpace(contact.MostLikelyNumber) || !cache_.TryGetValue(contact.MostLikelyNumber, out var startDates))
                 {
                     return false;
                 }
@@ -337,6 +340,7 @@ namespace BookingSMSReminder
             dismissedRemindersLog_.CleanUpLogAndAddNewEntry(null);
 
             listViewReminders_ = FindViewById<ListView>(Resource.Id.listview_reminders);
+            RegisterForContextMenu(listViewReminders_);
 
             remindersAdapter_ = new ReminderAdapter(this, reminders_);
             listViewReminders_.Adapter = remindersAdapter_;
@@ -431,6 +435,44 @@ namespace BookingSMSReminder
             }
         }
 
+        public override void OnCreateContextMenu(IContextMenu? menu, View? v, IContextMenuContextMenuInfo? menuInfo)
+        {
+            // https://www.geeksforgeeks.org/context-menu-in-android-with-example/
+
+            base.OnCreateContextMenu(menu, v, menuInfo);
+
+            menu.Add("Send Reminder Message Manually");
+            menu.Add("Copy Reminder Message");
+        }
+
+        public override bool OnContextItemSelected(IMenuItem item)
+        {
+            // https://stackoverflow.com/questions/18632331/using-contextmenu-with-listview-in-android
+            AdapterContextMenuInfo info = (AdapterContextMenuInfo)item.MenuInfo;
+            var position = info.Position;
+
+            if (position < 0)
+            {
+                return false;
+            }
+
+            var selReminder = reminders_[position];
+            if (item.TitleFormatted.ToString() == "Send Reminder Message Manually")
+            {
+                // chat-gpt generated:
+                Intent sendIntent = new Intent(Intent.ActionView);
+                sendIntent.SetData(Android.Net.Uri.Parse("sms:")); // Opens the SMS app
+                sendIntent.PutExtra("sms_body", selReminder.ReminderMessage); // Optional: Prepopulate the message body
+                StartActivity(sendIntent);
+            }
+            else if (item.TitleFormatted.ToString() == "Copy Reminder Message")
+            {
+                this.CopyToClipboard(selReminder.ReminderMessage);
+            }
+
+            return true;
+        }
+
         public void RefreshAll()
         {
             Data.Instance.ReloadContacts(this);
@@ -513,7 +555,7 @@ namespace BookingSMSReminder
                 {
                     if (reminder.Selected)
                     {
-                        SendMessage(reminder.PhoneNumber, reminder.Message);
+                        SendMessage(reminder.PhoneNumber, reminder.ReminderMessage);
                         c++;
                         persons.Add(reminder.Name);
 
@@ -641,7 +683,7 @@ namespace BookingSMSReminder
                                     Selected = false,
                                     Name = contact.DisplayName,
                                     PhoneNumber = contact.MostLikelyNumber,
-                                    Message = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.",
+                                    ReminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.",
                                     Contact = contact,
                                     StartTime = dtStart
                                 };
@@ -654,33 +696,33 @@ namespace BookingSMSReminder
                                     Selected = false,
                                     Name = contact.DisplayName,
                                     PhoneNumber = contact.MostLikelyNumber,
-                                    Message = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.",
+                                    ReminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.",
                                     Contact = contact,
                                     StartTime = dtStart
                                 };
                             }
                             else
                             {
+                                var practioner = Config.Instance.GetValue("practitioner_name");
+                                var company = Config.Instance.GetValue("organization_name");
+
+                                string practionerAndCompany = "";
+                                if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
+                                {
+                                    practionerAndCompany = $" with {practioner} at {company}";
+                                }
+                                else if (!string.IsNullOrWhiteSpace(practioner))
+                                {
+                                    practionerAndCompany = $" with {practioner}";
+                                }
+                                else if (!string.IsNullOrWhiteSpace(company))
+                                {
+                                    practionerAndCompany = $" at {company}";
+                                }
+
+                                string? nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
                                 if (contact.MostLikelyNumber != null)
                                 {
-                                    var practioner = Config.Instance.GetValue("practitioner_name");
-                                    var company = Config.Instance.GetValue("organization_name");
-
-                                    string practionerAndCompany = "";
-                                    if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
-                                    {
-                                        practionerAndCompany = $" with {practioner} at {company}";
-                                    }
-                                    else if (!string.IsNullOrWhiteSpace(practioner))
-                                    {
-                                        practionerAndCompany = $" with {practioner}";
-                                    }
-                                    else if (!string.IsNullOrWhiteSpace(company))
-                                    {
-                                        practionerAndCompany = $" at {company}";
-                                    }
-
-                                    string? nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
                                     yield return new Reminder
                                     {
                                         Status = Reminder.StatusEnum.Pending,
@@ -688,7 +730,7 @@ namespace BookingSMSReminder
                                         Name = contact.DisplayName,
                                         NameInCalendar = nameInCalendar,
                                         PhoneNumber = contact.MostLikelyNumber,
-                                        Message = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
+                                        ReminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
                                         Contact = contact,
                                         StartTime = dtStart
                                     };
@@ -700,8 +742,10 @@ namespace BookingSMSReminder
                                         Status = Reminder.StatusEnum.Error,
                                         Selected = false,
                                         Name = contact.DisplayName,
+                                        NameInCalendar = nameInCalendar,
                                         PhoneNumber = contact.MostLikelyNumber,
-                                        Message = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.",
+                                        ReminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.",
+                                        ReminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
                                         Contact = contact,
                                         StartTime = dtStart
                                     };
@@ -715,7 +759,7 @@ namespace BookingSMSReminder
                                 Status = Reminder.StatusEnum.Error,
                                 Selected = false,
                                 Name = clientName,
-                                Message = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled."
+                                ReminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled."
                             };
                         }
                     }

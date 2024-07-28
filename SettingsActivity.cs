@@ -30,7 +30,6 @@ namespace BookingSMSReminder
             UpdateOrganizationName();
         }
 
-        
         protected override void OnPause()
         {
             base.OnPause();

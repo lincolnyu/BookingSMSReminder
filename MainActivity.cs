@@ -33,8 +33,8 @@ namespace BookingSMSReminder
             public string? Name;
             public string? NameInCalendar;
             public string? PhoneNumber;
-            public string ReminderMessage;
-            public string ReminderStatusDescription;
+            public string? StatusDescription;
+            public string Message;
 
             public Data.Contact? Contact;
             public DateTime? StartTime;
@@ -42,7 +42,7 @@ namespace BookingSMSReminder
             public override string ToString()
             {
                 var nameStr = NameInCalendar != null ? $"{NameInCalendar}->{Name}" : Name;
-                return Status == StatusEnum.Pending ? $"[{nameStr}, {PhoneNumber}] {ReminderMessage}" : ReminderStatusDescription;
+                return Status == StatusEnum.Pending ? $"[{nameStr}, {PhoneNumber}] {Message}" : StatusDescription;
             }
         }
 
@@ -461,13 +461,24 @@ namespace BookingSMSReminder
             {
                 // chat-gpt generated:
                 Intent sendIntent = new Intent(Intent.ActionView);
-                sendIntent.SetData(Android.Net.Uri.Parse("sms:")); // Opens the SMS app
-                sendIntent.PutExtra("sms_body", selReminder.ReminderMessage); // Optional: Prepopulate the message body
+
+                // Open SMS app with or without a target phone number.
+                var number = selReminder.Contact?.MostLikelyNumber;
+                if (number != null)
+                {
+                    sendIntent.SetData(Android.Net.Uri.Parse("smsto:" + number));
+                }
+                else
+                {
+                    sendIntent.SetData(Android.Net.Uri.Parse("sms:"));
+                }
+
+                sendIntent.PutExtra("sms_body", selReminder.Message); // Optional: Prepopulate the message body
                 StartActivity(sendIntent);
             }
             else if (item.TitleFormatted.ToString() == "Copy Reminder Message")
             {
-                this.CopyToClipboard(selReminder.ReminderMessage);
+                this.CopyToClipboard(selReminder.Message);
             }
 
             return true;
@@ -555,7 +566,7 @@ namespace BookingSMSReminder
                 {
                     if (reminder.Selected)
                     {
-                        SendMessage(reminder.PhoneNumber, reminder.ReminderMessage);
+                        SendMessage(reminder.PhoneNumber, reminder.Message);
                         c++;
                         persons.Add(reminder.Name);
 
@@ -672,96 +683,78 @@ namespace BookingSMSReminder
                             clientName = clientName[..index].Trim();
                         }
 
+                        var practioner = Config.Instance.GetValue("practitioner_name");
+                        var company = Config.Instance.GetValue("organization_name");
+
+                        string practionerAndCompany = "";
+                        if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
+                        {
+                            practionerAndCompany = $" with {practioner} at {company}";
+                        }
+                        else if (!string.IsNullOrWhiteSpace(practioner))
+                        {
+                            practionerAndCompany = $" with {practioner}";
+                        }
+                        else if (!string.IsNullOrWhiteSpace(company))
+                        {
+                            practionerAndCompany = $" at {company}";
+                        }
+
+                        var reminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.";
+
                         var contact = Utility.SmartFindContact(clientName);
+                        string name;
+                        string? nameInCalendar = null;
+                        string? reminderStatusDescription = null;
+                        string? phoneNumber = null;
+
+                        Reminder.StatusEnum status;
+
                         if (contact != null)
                         {
+                            name = contact.DisplayName;
+                            nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
+                            phoneNumber = contact.MostLikelyNumber;
+
                             if (dismissedRemindersLog_.GetIfMessageLogged(contact, dtStart))
                             {
-                                yield return new Reminder
-                                {
-                                    Status = Reminder.StatusEnum.Dismissed,
-                                    Selected = false,
-                                    Name = contact.DisplayName,
-                                    PhoneNumber = contact.MostLikelyNumber,
-                                    ReminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.",
-                                    Contact = contact,
-                                    StartTime = dtStart
-                                };
+                                status = Reminder.StatusEnum.Dismissed;
+                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.";
                             }
                             else if (sentRemindersLog_.GetIfMessageLogged(contact, dtStart))
                             {
-                                yield return new Reminder
-                                {
-                                    Status = Reminder.StatusEnum.Sent,
-                                    Selected = false,
-                                    Name = contact.DisplayName,
-                                    PhoneNumber = contact.MostLikelyNumber,
-                                    ReminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.",
-                                    Contact = contact,
-                                    StartTime = dtStart
-                                };
+                                status = Reminder.StatusEnum.Sent;
+                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.";
+                            }
+                            else if (contact.MostLikelyNumber != null)
+                            {
+                                status = Reminder.StatusEnum.Pending;
                             }
                             else
                             {
-                                var practioner = Config.Instance.GetValue("practitioner_name");
-                                var company = Config.Instance.GetValue("organization_name");
-
-                                string practionerAndCompany = "";
-                                if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
-                                {
-                                    practionerAndCompany = $" with {practioner} at {company}";
-                                }
-                                else if (!string.IsNullOrWhiteSpace(practioner))
-                                {
-                                    practionerAndCompany = $" with {practioner}";
-                                }
-                                else if (!string.IsNullOrWhiteSpace(company))
-                                {
-                                    practionerAndCompany = $" at {company}";
-                                }
-
-                                string? nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
-                                if (contact.MostLikelyNumber != null)
-                                {
-                                    yield return new Reminder
-                                    {
-                                        Status = Reminder.StatusEnum.Pending,
-                                        Selected = false, // Sending not enabled by default to avoid being sent inadvertently.
-                                        Name = contact.DisplayName,
-                                        NameInCalendar = nameInCalendar,
-                                        PhoneNumber = contact.MostLikelyNumber,
-                                        ReminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
-                                        Contact = contact,
-                                        StartTime = dtStart
-                                    };
-                                }
-                                else
-                                {
-                                    yield return new Reminder
-                                    {
-                                        Status = Reminder.StatusEnum.Error,
-                                        Selected = false,
-                                        Name = contact.DisplayName,
-                                        NameInCalendar = nameInCalendar,
-                                        PhoneNumber = contact.MostLikelyNumber,
-                                        ReminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.",
-                                        ReminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.",
-                                        Contact = contact,
-                                        StartTime = dtStart
-                                    };
-                                }
+                                status = Reminder.StatusEnum.Error;
+                                reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
                             }
                         }
                         else
                         {
-                            yield return new Reminder
-                            {
-                                Status = Reminder.StatusEnum.Error,
-                                Selected = false,
-                                Name = clientName,
-                                ReminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled."
-                            };
+                            name = clientName;
+                            status = Reminder.StatusEnum.Error;
+                            reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
                         }
+
+                        yield return new Reminder
+                        {
+                            Status = status,
+                            Selected = false,
+                            Name = name,
+                            NameInCalendar = nameInCalendar,
+                            PhoneNumber = phoneNumber,
+                            StatusDescription = reminderStatusDescription,
+                            Message = reminderMessage,
+                            Contact = contact,
+                            StartTime = dtStart
+                        };
                     }
                 }
             }

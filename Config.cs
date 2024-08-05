@@ -1,4 +1,8 @@
-﻿namespace BookingSMSReminder
+﻿using Android.Icu.Text;
+using System.Xml.Linq;
+using static Android.Renderscripts.Sampler;
+
+namespace BookingSMSReminder
 {
     public class Config
     {
@@ -31,31 +35,12 @@
         }
 
         private string? configFile_;
+        bool loaded_ = false;
+        public Dictionary<string, string> KeyValuePair { get; } = new Dictionary<string, string>();
 
-        public string? GetValue(string key)
+        private void LoadKeyValuePairIfHasNotUnsafe()
         {
-            if (!File.Exists(ConfigFile)) return null;
-            using var sr = new StreamReader(ConfigFile);
-            while (!sr.EndOfStream)
-            {
-                var line = sr.ReadLine();
-                if (string.IsNullOrEmpty(line)) continue;
-                var sp = line.Split('=', StringSplitOptions.TrimEntries);
-                if (sp.Length != 2) continue;
-                var k = sp[0];
-                if (k == key)
-                {
-                    var v = sp[1];
-                    return v;
-                }
-            }
-            return null;
-        }
-
-        public void SetValue(string key, string value)
-        {
-            bool exists = false;
-            var kvp = new List<(string, string)>();
+            if (loaded_) return;
             if (File.Exists(ConfigFile))
             {
                 using var sr = new StreamReader(ConfigFile);
@@ -67,22 +52,51 @@
                     if (sp.Length != 2) continue;
                     var k = sp[0];
                     var v = sp[1];
-                    if (k == key)
-                    {
-                        v = value;
-                        exists = true;
-                    }
-                    kvp.Add((k, v));
+                    KeyValuePair[k] = v;
                 }
-                
             }
-            if (!exists)
+            loaded_ = true;
+        }
+
+        public string? GetValue(string key)
+        {
+            lock(this)
             {
-                kvp.Add((key, value));
+                LoadKeyValuePairIfHasNotUnsafe();
+
+                if (KeyValuePair.TryGetValue(key, out var val))
+                {
+                    return val;
+                }
+                return null;
             }
+        }
+
+        public void SetValue(string key, string value)
+        {
+            lock(this)
             {
+                LoadKeyValuePairIfHasNotUnsafe();
+
+                KeyValuePair[key] = value;
+            }
+        }
+
+        public void ClearValue(string key)
+        {
+            lock (this)
+            {
+                KeyValuePair.Remove(key);
+            }
+        }
+
+        public void Save()
+        {
+            lock(this)
+            {
+                LoadKeyValuePairIfHasNotUnsafe();
                 using var sw = new StreamWriter(ConfigFile);
-                foreach (var (k, v) in kvp)
+                foreach (var (k, v) in KeyValuePair)
                 {
                     sw.WriteLine($"{k}={v}");
                 }

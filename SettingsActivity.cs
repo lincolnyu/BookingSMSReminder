@@ -23,11 +23,11 @@ namespace BookingSMSReminder
 
             var editNotificationTime = FindViewById<EditText>(Resource.Id.edit_notification_time);
             editNotificationTime.Click += EditNotificationTime_Click;
-            UpdateEditTime();
 
-            UpdatePractitionerName();
+            var buttonReset = FindViewById<Button>(Resource.Id.button_reset_settings);
+            buttonReset.Click += EditToDefaultReset_Click;
 
-            UpdateOrganizationName();
+            UpdateConfigToEditTexts();
         }
 
         protected override void OnPause()
@@ -75,8 +75,9 @@ namespace BookingSMSReminder
             EventHandler<TimePickerDialog.TimeSetEventArgs> handler = (sender, args) =>
             {
                 var ntToSet = new TimeOnly(args.HourOfDay, args.Minute);
-                Config.Instance.SetValue("daily_notification_time", ntToSet.ToShortTimeString());
-                UpdateEditTime();
+                var field = Settings.Instance.Fields[Settings.FieldIndex.DailyNotificationTime];
+                field.UpdateToConfig(ntToSet);
+                field.UpdateConfigToUI(this);
             };
 
             var notificationTime = Utility.GetDailyNotificationTime();
@@ -84,34 +85,41 @@ namespace BookingSMSReminder
             timePickerDialog.Show();
         }
 
-        private void UpdateEditTime()
+        private void UpdateConfigToEditTexts()
         {
-            var editText = FindViewById<EditText>(Resource.Id.edit_notification_time);
-            var notificationTime = Utility.GetDailyNotificationTime();
-            editText.Text = Utility.PrintTime(notificationTime.Hour, notificationTime.Minute);
-        }
-
-        private void UpdatePractitionerName()
-        {
-            var editText = FindViewById<EditText>(Resource.Id.edit_practitioner_name);
-            var practitionerName = Config.Instance.GetValue("practitioner_name");
-            editText.Text = practitionerName ?? "";
-        }
-
-        private void UpdateOrganizationName()
-        {
-            var editText = FindViewById<EditText>(Resource.Id.edit_organization_name);
-            var organizationName = Config.Instance.GetValue("organization_name");
-            editText.Text = organizationName ?? "";
+            foreach (var field in Settings.Instance.Fields)
+            {
+                field.UpdateConfigToUI(this);
+            }
         }
 
         private void UpdateEditTextsToConfig()
         {
-            var editPractionerName = FindViewById<EditText>(Resource.Id.edit_practitioner_name);
-            Config.Instance.SetValue("practitioner_name", editPractionerName.Text.Trim());
+            foreach (var field in Settings.Instance.Fields)
+            {
+                if (field.EditorResourceId.HasValue)
+                {
+                    var editText = FindViewById<EditText>(field.EditorResourceId.Value);
+                    var (val, succ) = field.ConvertUIStringToValue(editText.Text.Trim());
+                    if (succ)
+                    {
+                        field.UpdateToConfig(val);
+                    }
+                }
+            }
+            Config.Instance.Save();
+        }
 
-            var editOrganizationName = FindViewById<EditText>(Resource.Id.edit_organization_name);
-            Config.Instance.SetValue("organization_name", editOrganizationName.Text.Trim());
+        private void EditToDefaultReset_Click(object? sender, EventArgs e)
+        {
+            foreach (var field in Settings.Instance.Fields)
+            {
+                if (field.EditorResourceId.HasValue)
+                {
+                    Config.Instance.ClearValue(field.ConfigField);
+                    field.UpdateConfigToUI(this);
+                }
+            }
         }
     }
 }

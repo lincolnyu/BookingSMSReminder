@@ -1,8 +1,6 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
-using Org.Apache.Http.Client.Params;
-using System.Globalization;
 using static BookingSMSReminder.Data;
 
 namespace BookingSMSReminder
@@ -102,20 +100,19 @@ namespace BookingSMSReminder
             return null;
         }
 
-        public static readonly TimeOnly DefaultNotificationTime = new TimeOnly(20, 30);
-
-        public static TimeOnly GetDailyNotificationTime(TimeOnly? defaultTime = null)
+        public static TimeOnly GetDailyNotificationTime()
         {
-            var notificationTimeStr = Config.Instance.GetValue("daily_notification_time");
-            TimeOnly? notificationTime = null;
-            if (notificationTimeStr != null)
+            var field = (Settings.Field<TimeOnly>)Settings.Instance.Fields[Settings.FieldIndex.DailyNotificationTime];
+            if (field.ConfigStringToValue != null)
             {
-                if (TimeOnly.TryParse(notificationTimeStr, out var nt))
+                var notificationTimeStr = Config.Instance.GetValue(field.ConfigField);
+                var (nt, succ) = field.ConfigStringToValue(notificationTimeStr);
+                if (succ)
                 {
                     return nt;
                 }
             }
-            return defaultTime ?? DefaultNotificationTime;
+            return field.DefaultValue;
         }
 
         public static Contact? SmartFindContact(string name)

@@ -1,4 +1,5 @@
 using Android.Content;
+using System.Text;
 
 namespace BookingSMSReminder
 {
@@ -34,12 +35,12 @@ namespace BookingSMSReminder
         {
             base.OnPause();
 
-            UpdateEditTextsToConfig();
+            UpdateEditTextsToConfig(false, null);
         }
 
         private void ButtonBackToMain_Click(object? sender, EventArgs e)
         {
-            ReturnToMain();
+            UpdateEditTextsToConfig(true, () => ReturnToMain());
         }
 
         private void ReturnToMain()
@@ -93,7 +94,7 @@ namespace BookingSMSReminder
             }
         }
 
-        private void UpdateEditTextsToConfig()
+        private void UpdateEditTextsToConfig(bool interactive, Action? endAction)
         {
             foreach (var field in Settings.Instance.Fields)
             {
@@ -107,7 +108,57 @@ namespace BookingSMSReminder
                     }
                 }
             }
-            Config.Instance.Save();
+
+            var warnings = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var field in Settings.Instance.Fields)
+            {
+                var (error, warning) = field.Validate();
+                if (!string.IsNullOrEmpty(error))
+                {
+                    errors.Add(error);
+                }
+                if (!string.IsNullOrEmpty(warning))
+                {
+                    warnings.Add(warning);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                Config.Instance.Reload();
+                if (interactive)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("The settings fields have the following errors, and the config changes are not saved.");
+                    foreach (var error in errors)
+                    {
+                        sb.AppendLine(error);
+                    }
+                    Utility.ShowAlert(this, "Settings Erorr", sb.ToString(), "OK", endAction);
+                    return;
+                }
+            }
+            else 
+            {
+                Config.Instance.Save();
+                if (warnings.Count > 0)
+                {
+                    if (interactive)
+                    {
+                        var sb = new StringBuilder();
+                        sb.AppendLine("The settings fields have the following warnings, but the changes are saved.");
+                        foreach (var error in errors)
+                        {
+                            sb.AppendLine(error);
+                        }
+                        Utility.ShowAlert(this, "Settings Erorr", sb.ToString(), "OK", endAction);
+                        return;
+                    }
+                }
+            }
+            endAction?.Invoke();
         }
 
         private void EditToDefaultReset_Click(object? sender, EventArgs e)

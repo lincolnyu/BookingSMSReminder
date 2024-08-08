@@ -1,7 +1,9 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
+using Android.Service.VR;
 using static BookingSMSReminder.Data;
+using static BookingSMSReminder.Settings;
 
 namespace BookingSMSReminder
 {
@@ -103,16 +105,7 @@ namespace BookingSMSReminder
         public static TimeOnly GetDailyNotificationTime()
         {
             var field = (Settings.Field<TimeOnly>)Settings.Instance.Fields[Settings.FieldIndex.DailyNotificationTime];
-            if (field.ConfigStringToValue != null)
-            {
-                var notificationTimeStr = Config.Instance.GetValue(field.ConfigField);
-                var (nt, succ) = field.ConfigStringToValue(notificationTimeStr);
-                if (succ)
-                {
-                    return nt;
-                }
-            }
-            return field.DefaultValue;
+            return field.Value;
         }
 
         public static Contact? SmartFindContact(string name)
@@ -128,7 +121,7 @@ namespace BookingSMSReminder
             var foundMatches = new List<Contact>();
             foreach (var contact in Data.Instance.Contacts.Values)
             {
-                var split = contact.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(x=>x.ToLower());
+                var split = contact.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(x => x.ToLower());
                 var match = true;
                 foreach (var s in nameSplit)
                 {
@@ -147,6 +140,53 @@ namespace BookingSMSReminder
                 return foundMatches[0];
             }
             return null;
+        }
+
+        public static string PrintDateTime(DateTime dtStart)
+        {
+            string[] Months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            string[] DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+            var timeStr = Utility.PrintTime(dtStart.Hour, dtStart.Minute);
+
+            var day = dtStart.Day;
+            var month = Months[dtStart.Month - 1];
+            var year = dtStart.Year;
+            var dayOfWeek = DaysOfWeek[(int)dtStart.DayOfWeek];
+            return $"{dayOfWeek} {day} {month} {year} @ {timeStr}";
+        }
+
+        public static string GenerateMessage(Settings settings, Contact? contact, DateTime startDateTime)
+        {
+            var messageTemplateField= (Field<string>)settings.Fields[Settings.FieldIndex.MessageTemplate];
+            var messageTemplate = messageTemplateField.Value;
+
+            if (string.IsNullOrWhiteSpace(messageTemplate)) return "";
+
+            var consultantNameField = (Field<string>)settings.Fields[Settings.FieldIndex.ConsultantName];
+            var consultantName = consultantNameField.Value;
+
+            var organizationNameField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationName];
+            var organizationName = organizationNameField.Value;
+
+            var organizationPhoneField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationPhone];
+            var organizationPhone = organizationPhoneField.Value;
+
+            var clientName = contact?.DisplayName?? "";
+
+            var message = messageTemplate.Replace("<time>", PrintDateTime(startDateTime))
+                .Replace("<consultant>", consultantName)
+                .Replace("<organization>", organizationName)
+                .Replace("<phone>", organizationPhone)
+                .Replace("<client>", clientName);
+
+            return message;
+        }
+
+        public static int EvaluateMessageLength(Settings settings)
+        {
+            var dummyContact = new Contact("David Smiths");
+            return GenerateMessage(settings, dummyContact, new DateTime(2000,12,31, 18, 30, 30)).Length;
         }
     }
 }

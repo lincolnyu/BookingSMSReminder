@@ -1,8 +1,4 @@
-﻿using Android.Icu.Text;
-using System.Xml.Linq;
-using static Android.Renderscripts.Sampler;
-
-namespace BookingSMSReminder
+﻿namespace BookingSMSReminder
 {
     public class Config
     {
@@ -27,8 +23,8 @@ namespace BookingSMSReminder
             get
             {
                 if (configFile_  == null) {
-                    var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-                    configFile_ = System.IO.Path.Combine(appDataPath, "main.cfg");
+                    var appDataPath = Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+                    configFile_ = Path.Combine(appDataPath, "main.cfg");
                 }
                 return configFile_;
             }
@@ -40,7 +36,10 @@ namespace BookingSMSReminder
 
         private void LoadKeyValuePairIfHasNotUnsafe()
         {
-            if (loaded_) return;
+            if (loaded_)
+            {
+                return;
+            }
             if (File.Exists(ConfigFile))
             {
                 using var sr = new StreamReader(ConfigFile);
@@ -86,6 +85,8 @@ namespace BookingSMSReminder
         {
             lock (this)
             {
+                LoadKeyValuePairIfHasNotUnsafe();
+
                 KeyValuePair.Remove(key);
             }
         }
@@ -100,6 +101,14 @@ namespace BookingSMSReminder
                 {
                     sw.WriteLine($"{k}={v}");
                 }
+            }
+        }
+
+        public void Reload()
+        {
+            lock(this)
+            {
+                loaded_ = false;
             }
         }
     }

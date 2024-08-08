@@ -8,9 +8,20 @@
             int? EditorResourceId { get; }
 
             void UpdateConfigToUI(Activity activity);
+
+            /// <summary>
+            ///  Updates the field value to config with validation
+            /// </summary>
+            /// <param name="value">The value to convert</param>
+            /// <returns>Error string if there's an error.</returns>
             void UpdateToConfig(object? value);
 
-            (object, bool) ConvertUIStringToValue(string str);
+            /// <summary>
+            ///  Return non-empty strings for validation errors and warnings respectively.
+            /// </summary>
+            (string, string) Validate();
+
+            (object?, bool) ConvertUIStringToValue(string str);
         }
 
         public class Field<T> : IField
@@ -27,16 +38,45 @@
             public Func<T, string>? ValueToUIString;
             public Func<T, string>? ValueToConfigString;
 
+            /// <summary>
+            ///  Return non-empty strings for validation errors and warnings respectively.
+            /// </summary>
+            public Func<(string, string)>? Validate;
+
             // Returns null upon parse failure
             public Func<string, (T, bool)>? UIStringToValue;
             public Func<string, (T, bool)>? ConfigStringToValue;
+
+            /// <summary>
+            ///  Load the value from the config or fall back on the default
+            /// </summary>
+            public T? Value
+            {
+                get
+                {
+                    var str = Config.Instance.GetValue(ConfigField);
+                    if (ConfigStringToValue != null && str != null)
+                    {
+                        var (v, succ) = ConfigStringToValue(str);
+                        if (succ)
+                        {
+                            return v;
+                        }
+                    }
+                    else if (typeof(T) == typeof(string) && str != null)
+                    {
+                        return (T)((object)str);
+                    }
+                    return DefaultValue?? default;
+                }
+            }
 
             /// <summary>
             ///  Convert UI string to the represented value using UIStringToValue. If UIStringToValue is unavailable, the UI string is retured as is.
             /// </summary>
             /// <param name="str">The string corresponding to the value in the UI</param>
             /// <returns>The value and whether it exits</returns>
-            public (object, bool) ConvertUIStringToValue(string str)
+            public (object?, bool) ConvertUIStringToValue(string str)
             {
                 if (UIStringToValue != null)
                 {
@@ -54,18 +94,26 @@
                 if (EditorResourceId != null)
                 {
                     var editText = activity.FindViewById<EditText>(EditorResourceId.Value);
-                    var val = Config.Instance.GetValue(ConfigField) ?? 
-                        ((ValueToUIString != null && DefaultValue != null)? ValueToUIString(DefaultValue) : DefaultValue?.ToString()?? "");
-                    editText.Text = val ?? "";
+                    var val = Value;
+                    string uistr;
+                    if (ValueToUIString != null)
+                    {
+                        uistr = ValueToUIString(val);
+                    }
+                    else
+                    {
+                        uistr = val?.ToString()?? "";
+                    }
+                    editText.Text = uistr;
                 }
             }
 
-            public void UpdateToConfig(object? value)
+            void IField.UpdateToConfig(object? value)
             {
-                SaveToConfig((T?)value);
+                UpdateToConfig((T?)value);
             }
 
-            public void SaveToConfig(T? value)
+            public void UpdateToConfig(T? value)
             {
                 if (ValueToConfigString != null)
                 {
@@ -77,6 +125,15 @@
                     // TODO null ?
                     Config.Instance.SetValue(ConfigField, value?.ToString()??"");
                 }
+            }
+
+            (string, string) IField.Validate()
+            {
+                if (Validate != null)
+                {
+                    return Validate();
+                }
+                return ("", "");
             }
         }
 
@@ -175,7 +232,17 @@
             {
                 ConfigField = "message_template",
                 EditorResourceId = Resource.Id.edit_message_template,
-                DefaultValue = "Appointment reminder for <time> with <consultant> at <organization>. Please reply Y to confirm or call <phone> to reschedule. Thanks."
+                DefaultValue = "Appointment reminder for <time> with <consultant> at <organization>. Please reply Y to confirm or call <phone> to reschedule. Thanks.",
+                ValueToConfigString = val => val.ToString(),
+                Validate = ()=>
+                {
+                    var len = Utility.EvaluateMessageLength(this);
+                    if (len > 160)
+                    {
+                        return ("", "The message may exceeding the length limit of 160");
+                    }
+                    return ("", "");
+                }
             };
 
             Fields[FieldIndex.ContactsAccountName] = new Field<string>

@@ -683,26 +683,10 @@ namespace BookingSMSReminder
                             clientName = clientName[..index].Trim();
                         }
 
-                        var practioner = Config.Instance.GetValue("practitioner_name");
-                        var company = Config.Instance.GetValue("organization_name");
-
-                        string practionerAndCompany = "";
-                        if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
-                        {
-                            practionerAndCompany = $" with {practioner} at {company}";
-                        }
-                        else if (!string.IsNullOrWhiteSpace(practioner))
-                        {
-                            practionerAndCompany = $" with {practioner}";
-                        }
-                        else if (!string.IsNullOrWhiteSpace(company))
-                        {
-                            practionerAndCompany = $" at {company}";
-                        }
-
-                        var reminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.";
-
                         var contact = Utility.SmartFindContact(clientName);
+
+                        var reminderMessage = Utility.GenerateMessage(Settings.Instance, contact, dtStart);
+
                         string name;
                         string? nameInCalendar = null;
                         string? reminderStatusDescription = null;
@@ -719,12 +703,12 @@ namespace BookingSMSReminder
                             if (dismissedRemindersLog_.GetIfMessageLogged(contact, dtStart))
                             {
                                 status = Reminder.StatusEnum.Dismissed;
-                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.";
+                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} is dismissed.";
                             }
                             else if (sentRemindersLog_.GetIfMessageLogged(contact, dtStart))
                             {
                                 status = Reminder.StatusEnum.Sent;
-                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.";
+                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} already sent.";
                             }
                             else if (contact.MostLikelyNumber != null)
                             {
@@ -733,14 +717,14 @@ namespace BookingSMSReminder
                             else
                             {
                                 status = Reminder.StatusEnum.Error;
-                                reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
+                                reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {Utility.PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
                             }
                         }
                         else
                         {
                             name = clientName;
                             status = Reminder.StatusEnum.Error;
-                            reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
+                            reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {Utility.PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
                         }
 
                         yield return new Reminder
@@ -760,19 +744,7 @@ namespace BookingSMSReminder
             }
         }
 
-        private string PrintDateTime(DateTime dtStart)
-        {
-            string[] Months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            string[] DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-            var timeStr = Utility.PrintTime(dtStart.Hour, dtStart.Minute);
-
-            var day = dtStart.Day;
-            var month = Months[dtStart.Month - 1];
-            var year = dtStart.Year;
-            var dayOfWeek = DaysOfWeek[(int)dtStart.DayOfWeek];
-            return $"{dayOfWeek} {day} {month} {year} @ {timeStr}";
-        }
 
         private static bool IsRemindableStartTime(DateTime dtStart)
         {

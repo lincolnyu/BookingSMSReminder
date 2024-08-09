@@ -7,14 +7,14 @@
             string ConfigField { get; }
             int? EditorResourceId { get; }
 
-            void UpdateConfigToUI(Activity activity);
+            void UpdateToUI(Activity activity);
 
             /// <summary>
             ///  Updates the field value to config with validation
             /// </summary>
             /// <param name="value">The value to convert</param>
             /// <returns>Error string if there's an error.</returns>
-            void UpdateToConfig(object? value);
+            void SetValue(object? value);
 
             /// <summary>
             ///  Return non-empty strings for validation errors and warnings respectively.
@@ -69,6 +69,11 @@
                     }
                     return DefaultValue?? default;
                 }
+
+                set
+                {
+                    SetValue(value);
+                }
             }
 
             /// <summary>
@@ -89,7 +94,7 @@
                 }
             }
 
-            public void UpdateConfigToUI(Activity activity)
+            public void UpdateToUI(Activity activity)
             {
                 if (EditorResourceId != null)
                 {
@@ -108,12 +113,12 @@
                 }
             }
 
-            void IField.UpdateToConfig(object? value)
+            void IField.SetValue(object? value)
             {
-                UpdateToConfig((T?)value);
+                SetValue((T?)value);
             }
 
-            public void UpdateToConfig(T? value)
+            private void SetValue(T? value)
             {
                 if (ValueToConfigStringFunc != null)
                 {

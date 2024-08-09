@@ -77,8 +77,8 @@ namespace BookingSMSReminder
             {
                 var ntToSet = new TimeOnly(args.HourOfDay, args.Minute);
                 var field = Settings.Instance.Fields[Settings.FieldIndex.DailyNotificationTime];
-                field.UpdateToConfig(ntToSet);
-                field.UpdateConfigToUI(this);
+                field.SetValue(ntToSet);
+                field.UpdateToUI(this);
             };
 
             var notificationTime = Utility.GetDailyNotificationTime();
@@ -90,7 +90,7 @@ namespace BookingSMSReminder
         {
             foreach (var field in Settings.Instance.Fields)
             {
-                field.UpdateConfigToUI(this);
+                field.UpdateToUI(this);
             }
         }
 
@@ -104,7 +104,7 @@ namespace BookingSMSReminder
                     var (val, succ) = field.ConvertUIStringToValue(editText.Text.Trim());
                     if (succ)
                     {
-                        field.UpdateToConfig(val);
+                        field.SetValue(val);
                     }
                 }
             }
@@ -168,7 +168,7 @@ namespace BookingSMSReminder
                 if (field.EditorResourceId.HasValue)
                 {
                     Config.Instance.ClearValue(field.ConfigField);
-                    field.UpdateConfigToUI(this);
+                    field.UpdateToUI(this);
                 }
             }
         }

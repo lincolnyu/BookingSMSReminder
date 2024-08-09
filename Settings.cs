@@ -227,7 +227,7 @@
             Fields[FieldIndex.OrganizationPhone] = new Field<string>
             {
                 ConfigField = "organization_phone",
-                EditorResourceId = Resource.Id.edit_organization_phone,
+                EditorResourceId = Resource.Id.edit_organization_phone
 #if KMP
                 , DefaultValue = "0400693696"
 #endif

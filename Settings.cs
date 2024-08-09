@@ -35,17 +35,17 @@
             /// </summary>
             public T? DefaultValue;
 
-            public Func<T, string>? ValueToUIString;
-            public Func<T, string>? ValueToConfigString;
+            public Func<T, string>? ValueToUIStringFunc;
+            public Func<T, string>? ValueToConfigStringFunc;
 
             /// <summary>
             ///  Return non-empty strings for validation errors and warnings respectively.
             /// </summary>
-            public Func<(string, string)>? Validate;
+            public Func<T?, (string, string)>? ValidateFunc;
 
             // Returns null upon parse failure
-            public Func<string, (T, bool)>? UIStringToValue;
-            public Func<string, (T, bool)>? ConfigStringToValue;
+            public Func<string, (T, bool)>? UIStringToValueFunc;
+            public Func<string, (T, bool)>? ConfigStringToValueFunc;
 
             /// <summary>
             ///  Load the value from the config or fall back on the default
@@ -55,9 +55,9 @@
                 get
                 {
                     var str = Config.Instance.GetValue(ConfigField);
-                    if (ConfigStringToValue != null && str != null)
+                    if (ConfigStringToValueFunc != null && str != null)
                     {
-                        var (v, succ) = ConfigStringToValue(str);
+                        var (v, succ) = ConfigStringToValueFunc(str);
                         if (succ)
                         {
                             return v;
@@ -78,9 +78,9 @@
             /// <returns>The value and whether it exits</returns>
             public (object?, bool) ConvertUIStringToValue(string str)
             {
-                if (UIStringToValue != null)
+                if (UIStringToValueFunc != null)
                 {
-                    var (val, succ) = UIStringToValue(str);
+                    var (val, succ) = UIStringToValueFunc(str);
                     return (val, succ);
                 }
                 else
@@ -96,9 +96,9 @@
                     var editText = activity.FindViewById<EditText>(EditorResourceId.Value);
                     var val = Value;
                     string uistr;
-                    if (ValueToUIString != null)
+                    if (ValueToUIStringFunc != null)
                     {
-                        uistr = ValueToUIString(val);
+                        uistr = ValueToUIStringFunc(val);
                     }
                     else
                     {
@@ -115,9 +115,9 @@
 
             public void UpdateToConfig(T? value)
             {
-                if (ValueToConfigString != null)
+                if (ValueToConfigStringFunc != null)
                 {
-                    var str = ValueToConfigString(value);
+                    var str = ValueToConfigStringFunc(value);
                     Config.Instance.SetValue(ConfigField, str);
                 }
                 else
@@ -129,9 +129,9 @@
 
             (string, string) IField.Validate()
             {
-                if (Validate != null)
+                if (ValidateFunc != null)
                 {
-                    return Validate();
+                    return ValidateFunc(Value);
                 }
                 return ("", "");
             }
@@ -176,10 +176,10 @@
                 ConfigField = "daily_notification_time",
                 EditorResourceId = Resource.Id.edit_notification_time,
                 DefaultValue = new TimeOnly(17, 30),
-                ValueToUIString = val => val.ToShortTimeString(),
-                ValueToConfigString = val => val.ToShortTimeString(),
-                ConfigStringToValue = stringToTimeOnly,
-                UIStringToValue = stringToTimeOnly
+                ValueToUIStringFunc = val => val.ToShortTimeString(),
+                ValueToConfigStringFunc = val => val.ToShortTimeString(),
+                ConfigStringToValueFunc = stringToTimeOnly,
+                UIStringToValueFunc = stringToTimeOnly
             };
 
             Func<string, (int, bool)> stringToInt = str =>
@@ -195,10 +195,10 @@
                 ConfigField = "reminder_days_ahead",
                 EditorResourceId = Resource.Id.edit_reminder_day,
                 DefaultValue = 1,
-                ValueToUIString = val => val.ToString(),
-                ValueToConfigString = val => val.ToString(),
-                ConfigStringToValue = stringToInt,
-                UIStringToValue = stringToInt
+                ValueToUIStringFunc = val => val.ToString(),
+                ValueToConfigStringFunc = val => val.ToString(),
+                ConfigStringToValueFunc = stringToInt,
+                UIStringToValueFunc = stringToInt
             };
 
             Fields[FieldIndex.ConsultantName] = new Field<string>
@@ -222,7 +222,7 @@
             Fields[FieldIndex.OrganizationPhone] = new Field<string>
             {
                 ConfigField = "organization_phone",
-                EditorResourceId = Resource.Id.edit_organization_phone
+                EditorResourceId = Resource.Id.edit_organization_phone,
 #if KMP
                 , DefaultValue = "0400693696"
 #endif
@@ -233,22 +233,30 @@
                 ConfigField = "message_template",
                 EditorResourceId = Resource.Id.edit_message_template,
                 DefaultValue = "Appointment reminder for <time> with <consultant> at <organization>. Please reply Y to confirm or call <phone> to reschedule. Thanks.",
-                ValueToConfigString = val => val.ToString(),
-                Validate = ()=>
+                ValueToConfigStringFunc = val => val.ToString(),
+                ValidateFunc = val =>
                 {
-                    var len = Utility.EvaluateMessageLength(this);
-                    if (len > 160)
+                    if (string.IsNullOrEmpty(val))
                     {
-                        return ("", "The message may exceeding the length limit of 160");
+                        return ("", "Empty message template.");
                     }
-                    return ("", "");
+                    var warnings = Utility.ValidateMessageTemplate(this);
+                    return ("", warnings);
                 }
             };
 
             Fields[FieldIndex.ContactsAccountName] = new Field<string>
             {
                 ConfigField = "contacts_account_name",
-                EditorResourceId = Resource.Id.edit_contacts_account_name
+                EditorResourceId = Resource.Id.edit_contacts_account_name,
+                ValidateFunc = val =>
+                {
+                    if (string.IsNullOrEmpty(val))
+                    {
+                        return ("", "Missing Contact account name.");
+                    }
+                    return ("", "");
+                }
 #if KMP
                 , DefaultValue = "kineticmobilept@gmail.com"
 #endif
@@ -257,7 +265,15 @@
             Fields[FieldIndex.CalendarAccountName] = new Field<string>
             {
                 ConfigField= "calendar_account_name",
-                EditorResourceId  = Resource.Id.edit_calendar_account_name
+                EditorResourceId  = Resource.Id.edit_calendar_account_name,
+                ValidateFunc = val =>
+                {
+                    if (string.IsNullOrEmpty(val))
+                    {
+                        return ("", "Missing Calendar account name.");
+                    }
+                    return ("", "");
+                }
 #if KMP
                 , DefaultValue = "kineticmobilept@gmail.com"
 #endif
@@ -266,7 +282,15 @@
             Fields[FieldIndex.CalendarDisplayName] = new Field<string>
             {
                 ConfigField = "calendar_display_name",
-                EditorResourceId = Resource.Id.edit_calendar_display_name
+                EditorResourceId = Resource.Id.edit_calendar_display_name,
+                ValidateFunc = val =>
+                {
+                    if (string.IsNullOrEmpty(val))
+                    {
+                        return ("", "Missing Calendar display name.");
+                    }
+                    return ("", "");
+                }
 #if KMP
                 , DefaultValue = "kineticmobilept@gmail.com"
 #endif

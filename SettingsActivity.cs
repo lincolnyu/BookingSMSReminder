@@ -127,7 +127,7 @@ namespace BookingSMSReminder
 
             if (errors.Count > 0)
             {
-                Config.Instance.Reload();
+                Config.Instance.Reload();   // Revert changes.
                 if (interactive)
                 {
                     var sb = new StringBuilder();
@@ -136,24 +136,24 @@ namespace BookingSMSReminder
                     {
                         sb.AppendLine(error);
                     }
-                    Utility.ShowAlert(this, "Settings Erorr", sb.ToString(), "OK", endAction);
+                    Utility.ShowAlert(this, "Settings Errors", sb.ToString(), "OK", endAction);
                     return;
                 }
             }
             else 
             {
-                Config.Instance.Save();
+                Config.Instance.Save();     // Persist the changes when there's no errors.
                 if (warnings.Count > 0)
                 {
                     if (interactive)
                     {
                         var sb = new StringBuilder();
                         sb.AppendLine("The settings fields have the following warnings, but the changes are saved.");
-                        foreach (var error in errors)
+                        foreach (var warning in warnings)
                         {
-                            sb.AppendLine(error);
+                            sb.AppendLine(warning);
                         }
-                        Utility.ShowAlert(this, "Settings Erorr", sb.ToString(), "OK", endAction);
+                        Utility.ShowAlert(this, "Settings Warnings", sb.ToString(), "OK", endAction);
                         return;
                     }
                 }

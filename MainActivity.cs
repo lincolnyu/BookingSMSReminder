@@ -6,9 +6,9 @@ using Android.Content;
 using Android.Database;
 using Android.OS;
 using Android.Provider;
-using Android.Service.QuickAccessWallet;
 using Android.Telephony;
 using Android.Views;
+using System.Text;
 using static Android.Widget.AdapterView;
 
 namespace BookingSMSReminder
@@ -322,7 +322,18 @@ namespace BookingSMSReminder
         private Handler handler_;
         private ReminderChecker reminderChecker_;
 
-        private bool initialized_ = false;
+        /// <summary>
+        ///  Whether OnCreate() has been called and the class has been initialized.
+        /// </summary>
+        /// <remarks>
+        ///  Some methods may be called prior to OnCreate() and actions in them may only be executed after initialization.
+        /// </remarks>
+        private bool initializedAndCreated_ = false;
+
+        /// <summary>
+        ///  ValidateSettingOnFirstRun() is run only once and this class may be created multiple times, and that's why this flag is static.
+        /// </summary>
+        private static bool validateSettingsOnFirstRunHasBeenRun_ = false;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -371,7 +382,14 @@ namespace BookingSMSReminder
 
             StartRepeatingTask();
 
-            initialized_ = true;
+            if (!validateSettingsOnFirstRunHasBeenRun_)
+            {
+                // Run this only onece
+                ValidateSettingsOnFirstRun();
+                validateSettingsOnFirstRunHasBeenRun_ = true;
+            }
+
+            initializedAndCreated_ = true;
         }
 
         private bool CheckPermissions()
@@ -418,7 +436,7 @@ namespace BookingSMSReminder
         {
             base.OnDestroy();
 
-            if (initialized_)
+            if (initializedAndCreated_)
             {
                 StopRepeatingTask();
             }
@@ -428,9 +446,8 @@ namespace BookingSMSReminder
         {
             base.OnResume();
 
-            if (initialized_)
+            if (initializedAndCreated_)
             {
-                ValidateSettings();
                 RefreshAll();
             }
         }
@@ -491,14 +508,46 @@ namespace BookingSMSReminder
             RefreshReminders();
         }
 
-        private void ValidateSettings()
+        private void ValidateSettingsOnFirstRun()
         {
-            var practioner = Config.Instance.GetValue("practitioner_name");
-            var company = Config.Instance.GetValue("organization_name");
+            var warnings = new List<string>();
+            var errors = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(practioner) && string.IsNullOrWhiteSpace(company))
+            foreach (var field in Settings.Instance.Fields)
             {
-                Utility.ShowAlert(this, "Settings Error", "Neither practitioner nor organization have been specified in Settings.", "OK");
+                var (error, warning) = field.Validate();
+                if (!string.IsNullOrEmpty(error))
+                {
+                    errors.Add(error);
+                }
+                if (!string.IsNullOrEmpty(warning))
+                {
+                    warnings.Add(warning);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("The settings fields have the following errors:");
+                foreach (var error in errors)
+                {
+                    sb.AppendLine(error);
+                }
+                Utility.ShowAlert(this, "Initial Settings Validation", sb.ToString(), "OK");
+            }
+            else
+            {
+                if (warnings.Count > 0)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("The settings fields have the following warnings:");
+                    foreach (var warning in warnings)
+                    {
+                        sb.AppendLine(warning);
+                    }
+                    Utility.ShowAlert(this, "Initial Settings Validation", sb.ToString(), "OK");
+                }
             }
         }
 
@@ -685,7 +734,7 @@ namespace BookingSMSReminder
 
                         var contact = Utility.SmartFindContact(clientName);
 
-                        var reminderMessage = Utility.GenerateMessage(Settings.Instance, contact, dtStart);
+                        var reminderMessage = Utility.GenerateMessage(Settings.Instance, contact, dtStart, null);
 
                         string name;
                         string? nameInCalendar = null;

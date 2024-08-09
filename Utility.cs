@@ -1,7 +1,7 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
-using Android.Service.VR;
+using System.Text;
 using static BookingSMSReminder.Data;
 using static BookingSMSReminder.Settings;
 
@@ -9,6 +9,8 @@ namespace BookingSMSReminder
 {
     public static class Utility
     {
+        public const int MaxAllowedSMSLength = 160;
+
         public static string PrintTime(int hourOfDay, int minute)
         {
             var hour = hourOfDay > 12 ? hourOfDay - 12 : hourOfDay;
@@ -156,37 +158,97 @@ namespace BookingSMSReminder
             return $"{dayOfWeek} {day} {month} {year} @ {timeStr}";
         }
 
-        public static string GenerateMessage(Settings settings, Contact? contact, DateTime startDateTime)
+        public static string GenerateMessage(Settings settings, Contact? contact, DateTime startDateTime, List<string>? settingsErrors)
         {
             var messageTemplateField= (Field<string>)settings.Fields[Settings.FieldIndex.MessageTemplate];
             var messageTemplate = messageTemplateField.Value;
 
             if (string.IsNullOrWhiteSpace(messageTemplate)) return "";
 
-            var consultantNameField = (Field<string>)settings.Fields[Settings.FieldIndex.ConsultantName];
-            var consultantName = consultantNameField.Value;
+            var message = messageTemplate.Replace("<time>", PrintDateTime(startDateTime));
+            if (message.Contains("<consultant>"))
+            {
+                var consultantNameField = (Field<string>)settings.Fields[Settings.FieldIndex.ConsultantName];
+                var consultantName = consultantNameField.Value;
 
-            var organizationNameField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationName];
-            var organizationName = organizationNameField.Value;
+                if (string.IsNullOrWhiteSpace(consultantName))
+                {
+                    if (settingsErrors != null)
+                    {
+                        settingsErrors.Add("Missing consultant name.");
+                    }
+                    // The placeholder won't be replaced if there is an error. Same below.
+                }
+                else
+                {
+                    message = message.Replace("<consultant>", consultantName);
+                }
+            }
+            
+            if (message.Contains("<organization"))
+            {
+                var organizationNameField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationName];
+                var organizationName = organizationNameField.Value;
 
-            var organizationPhoneField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationPhone];
-            var organizationPhone = organizationPhoneField.Value;
+                if (string.IsNullOrWhiteSpace(organizationName))
+                {
+                    if (settingsErrors != null)
+                    {
+                        settingsErrors.Add("Missing organization name.");
+                    }
+                }
+                else
+                {
+                    message = message.Replace("<organization>", organizationName);
+                }
+            }
 
-            var clientName = contact?.DisplayName?? "";
+            if (message.Contains("<phone>"))
+            {
+                var organizationPhoneField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationPhone];
+                var organizationPhone = organizationPhoneField.Value;
 
-            var message = messageTemplate.Replace("<time>", PrintDateTime(startDateTime))
-                .Replace("<consultant>", consultantName)
-                .Replace("<organization>", organizationName)
-                .Replace("<phone>", organizationPhone)
-                .Replace("<client>", clientName);
+                if (string.IsNullOrWhiteSpace(organizationPhone))
+                {
+                    if (settingsErrors != null)
+                    {
+                        settingsErrors.Add("Missing organization phone number.");
+                    }
+                }
+                else
+                {
+                    message = message.Replace("<phone>", organizationPhone);
+                }
+            }
+
+            if (message.Contains("<client>"))
+            {
+                var clientName = contact?.DisplayName;
+                // Because missing client name is not a settings error, so we don't report.
+                if (!string.IsNullOrWhiteSpace(clientName))
+                {
+                    message = message.Replace("<client>", clientName);
+                }
+            }
 
             return message;
         }
 
-        public static int EvaluateMessageLength(Settings settings)
+        /// <summary>
+        ///  Validate message template against other settings and returns non-empty string if validation fails.
+        /// </summary>
+        /// <param name="settings">The settings in which message template is validated.</param>
+        /// <returns>Non-empty string if there are validation errors.</returns>
+        public static string ValidateMessageTemplate(Settings settings)
         {
             var dummyContact = new Contact("David Smiths");
-            return GenerateMessage(settings, dummyContact, new DateTime(2000,12,31, 18, 30, 30)).Length;
+            var errors = new List<string>();
+            var message = GenerateMessage(settings, dummyContact, new DateTime(2000,12,31, 18, 30, 30), errors);
+            if (message.Length > MaxAllowedSMSLength)
+            {
+                errors.Insert(0, "Message may exceed 160 character limit.");
+            }
+            return string.Join(" ", errors);
         }
     }
 }

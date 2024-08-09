@@ -6,9 +6,9 @@ using Android.Content;
 using Android.Database;
 using Android.OS;
 using Android.Provider;
-using Android.Service.QuickAccessWallet;
 using Android.Telephony;
 using Android.Views;
+using System.Text;
 using static Android.Widget.AdapterView;
 
 namespace BookingSMSReminder
@@ -322,7 +322,18 @@ namespace BookingSMSReminder
         private Handler handler_;
         private ReminderChecker reminderChecker_;
 
-        private bool initialized_ = false;
+        /// <summary>
+        ///  Whether OnCreate() has been called and the class has been initialized.
+        /// </summary>
+        /// <remarks>
+        ///  Some methods may be called prior to OnCreate() and actions in them may only be executed after initialization.
+        /// </remarks>
+        private bool initializedAndCreated_ = false;
+
+        /// <summary>
+        ///  ValidateSettingOnFirstRun() is run only once and this class may be created multiple times, and that's why this flag is static.
+        /// </summary>
+        private static bool validateSettingsOnFirstRunHasBeenRun_ = false;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -371,7 +382,14 @@ namespace BookingSMSReminder
 
             StartRepeatingTask();
 
-            initialized_ = true;
+            if (!validateSettingsOnFirstRunHasBeenRun_)
+            {
+                // Run this only onece
+                ValidateSettingsOnFirstRun();
+                validateSettingsOnFirstRunHasBeenRun_ = true;
+            }
+
+            initializedAndCreated_ = true;
         }
 
         private bool CheckPermissions()
@@ -418,7 +436,7 @@ namespace BookingSMSReminder
         {
             base.OnDestroy();
 
-            if (initialized_)
+            if (initializedAndCreated_)
             {
                 StopRepeatingTask();
             }
@@ -428,9 +446,8 @@ namespace BookingSMSReminder
         {
             base.OnResume();
 
-            if (initialized_)
+            if (initializedAndCreated_)
             {
-                ValidateSettings();
                 RefreshAll();
             }
         }
@@ -491,14 +508,46 @@ namespace BookingSMSReminder
             RefreshReminders();
         }
 
-        private void ValidateSettings()
+        private void ValidateSettingsOnFirstRun()
         {
-            var practioner = Config.Instance.GetValue("practitioner_name");
-            var company = Config.Instance.GetValue("organization_name");
+            var warnings = new List<string>();
+            var errors = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(practioner) && string.IsNullOrWhiteSpace(company))
+            foreach (var field in Settings.Instance.Fields)
             {
-                Utility.ShowAlert(this, "Settings Error", "Neither practitioner nor organization have been specified in Settings.", "OK");
+                var (error, warning) = field.Validate();
+                if (!string.IsNullOrEmpty(error))
+                {
+                    errors.Add(error);
+                }
+                if (!string.IsNullOrEmpty(warning))
+                {
+                    warnings.Add(warning);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("The settings fields have the following errors:");
+                foreach (var error in errors)
+                {
+                    sb.AppendLine(error);
+                }
+                Utility.ShowAlert(this, "Initial Settings Validation", sb.ToString(), "OK");
+            }
+            else
+            {
+                if (warnings.Count > 0)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("The settings fields have the following warnings:");
+                    foreach (var warning in warnings)
+                    {
+                        sb.AppendLine(warning);
+                    }
+                    Utility.ShowAlert(this, "Initial Settings Validation", sb.ToString(), "OK");
+                }
             }
         }
 
@@ -683,26 +732,10 @@ namespace BookingSMSReminder
                             clientName = clientName[..index].Trim();
                         }
 
-                        var practioner = Config.Instance.GetValue("practitioner_name");
-                        var company = Config.Instance.GetValue("organization_name");
-
-                        string practionerAndCompany = "";
-                        if (!string.IsNullOrWhiteSpace(practioner) || !string.IsNullOrWhiteSpace(company))
-                        {
-                            practionerAndCompany = $" with {practioner} at {company}";
-                        }
-                        else if (!string.IsNullOrWhiteSpace(practioner))
-                        {
-                            practionerAndCompany = $" with {practioner}";
-                        }
-                        else if (!string.IsNullOrWhiteSpace(company))
-                        {
-                            practionerAndCompany = $" at {company}";
-                        }
-
-                        var reminderMessage = $"Appointment reminder for {PrintDateTime(dtStart)}{practionerAndCompany}. Please reply Y to confirm or call 0400693696 to reschedule. Thanks.";
-
                         var contact = Utility.SmartFindContact(clientName);
+
+                        var reminderMessage = Utility.GenerateMessage(Settings.Instance, contact, dtStart, null);
+
                         string name;
                         string? nameInCalendar = null;
                         string? reminderStatusDescription = null;
@@ -719,12 +752,12 @@ namespace BookingSMSReminder
                             if (dismissedRemindersLog_.GetIfMessageLogged(contact, dtStart))
                             {
                                 status = Reminder.StatusEnum.Dismissed;
-                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} is dismissed.";
+                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} is dismissed.";
                             }
                             else if (sentRemindersLog_.GetIfMessageLogged(contact, dtStart))
                             {
                                 status = Reminder.StatusEnum.Sent;
-                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {PrintDateTime(dtStart)} already sent.";
+                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} already sent.";
                             }
                             else if (contact.MostLikelyNumber != null)
                             {
@@ -733,14 +766,14 @@ namespace BookingSMSReminder
                             else
                             {
                                 status = Reminder.StatusEnum.Error;
-                                reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
+                                reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {Utility.PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
                             }
                         }
                         else
                         {
                             name = clientName;
                             status = Reminder.StatusEnum.Error;
-                            reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
+                            reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {Utility.PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
                         }
 
                         yield return new Reminder
@@ -760,19 +793,7 @@ namespace BookingSMSReminder
             }
         }
 
-        private string PrintDateTime(DateTime dtStart)
-        {
-            string[] Months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            string[] DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-            var timeStr = Utility.PrintTime(dtStart.Hour, dtStart.Minute);
-
-            var day = dtStart.Day;
-            var month = Months[dtStart.Month - 1];
-            var year = dtStart.Year;
-            var dayOfWeek = DaysOfWeek[(int)dtStart.DayOfWeek];
-            return $"{dayOfWeek} {day} {month} {year} @ {timeStr}";
-        }
 
         private static bool IsRemindableStartTime(DateTime dtStart)
         {

@@ -4,19 +4,34 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <LinearLayout
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
         android:orientation="vertical"
         android:minWidth="25px"
         android:minHeight="25px"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent">
+        <RelativeLayout
+            android:orientation="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content">
+            <Button
+                android:text="Back to Main"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/button_settings_back_to_main"
+                android:layout_alignParentLeft="true" />
 
-        <Button
-            android:text="Back to Main"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/button_settings_back_to_main"
-            android:layout_alignParentLeft="true" />
+            <Button
+                android:text="Reset to Default"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/button_reset_settings"
+                android:layout_alignParentRight="true" />
+        </RelativeLayout>
 
         <TextView
             android:text="Reminding"
@@ -33,6 +48,17 @@
 
         <EditText
             android:id="@+id/edit_notification_time"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:text="Reminding Day Ahead of Appointment"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/edit_reminder_day"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content" />
 
@@ -58,6 +84,61 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content" />
 
+        <TextView
+            android:text="Organization Phone"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/edit_organization_phone"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:text="Message Template"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/edit_message_template"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:text="Contacts Account Name"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/edit_contacts_account_name"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:text="Calendar Account Name"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/edit_calendar_account_name"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" />
+
+        
+        <TextView
+            android:text="Calendar Display Name"
+            android:textSize="60px"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/edit_calendar_display_name"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" />
 
         <LinearLayout
                 android:orientation="horizontal"
@@ -77,6 +158,6 @@
                 android:id="@+id/button_reset_dismissed_reminders_log" 
                 android:layout_alignParentLeft="true" />
         </LinearLayout>
-
-    </LinearLayout>
+      </LinearLayout>
+    </ScrollView>
 </RelativeLayout>

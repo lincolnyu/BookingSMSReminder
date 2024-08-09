@@ -1,4 +1,5 @@
 using Android.Content;
+using System.Text;
 
 namespace BookingSMSReminder
 {
@@ -23,23 +24,23 @@ namespace BookingSMSReminder
 
             var editNotificationTime = FindViewById<EditText>(Resource.Id.edit_notification_time);
             editNotificationTime.Click += EditNotificationTime_Click;
-            UpdateEditTime();
 
-            UpdatePractitionerName();
+            var buttonReset = FindViewById<Button>(Resource.Id.button_reset_settings);
+            buttonReset.Click += EditToDefaultReset_Click;
 
-            UpdateOrganizationName();
+            UpdateConfigToEditTexts();
         }
 
         protected override void OnPause()
         {
             base.OnPause();
 
-            UpdateEditTextsToConfig();
+            UpdateEditTextsToConfig(false, null);
         }
 
         private void ButtonBackToMain_Click(object? sender, EventArgs e)
         {
-            ReturnToMain();
+            UpdateEditTextsToConfig(true, () => ReturnToMain());
         }
 
         private void ReturnToMain()
@@ -75,8 +76,9 @@ namespace BookingSMSReminder
             EventHandler<TimePickerDialog.TimeSetEventArgs> handler = (sender, args) =>
             {
                 var ntToSet = new TimeOnly(args.HourOfDay, args.Minute);
-                Config.Instance.SetValue("daily_notification_time", ntToSet.ToShortTimeString());
-                UpdateEditTime();
+                var field = Settings.Instance.Fields[Settings.FieldIndex.DailyNotificationTime];
+                field.SetValue(ntToSet);
+                field.UpdateToUI(this);
             };
 
             var notificationTime = Utility.GetDailyNotificationTime();
@@ -84,34 +86,91 @@ namespace BookingSMSReminder
             timePickerDialog.Show();
         }
 
-        private void UpdateEditTime()
+        private void UpdateConfigToEditTexts()
         {
-            var editText = FindViewById<EditText>(Resource.Id.edit_notification_time);
-            var notificationTime = Utility.GetDailyNotificationTime();
-            editText.Text = Utility.PrintTime(notificationTime.Hour, notificationTime.Minute);
+            foreach (var field in Settings.Instance.Fields)
+            {
+                field.UpdateToUI(this);
+            }
         }
 
-        private void UpdatePractitionerName()
+        private void UpdateEditTextsToConfig(bool interactive, Action? endAction)
         {
-            var editText = FindViewById<EditText>(Resource.Id.edit_practitioner_name);
-            var practitionerName = Config.Instance.GetValue("practitioner_name");
-            editText.Text = practitionerName ?? "";
+            foreach (var field in Settings.Instance.Fields)
+            {
+                if (field.EditorResourceId.HasValue)
+                {
+                    var editText = FindViewById<EditText>(field.EditorResourceId.Value);
+                    var (val, succ) = field.ConvertUIStringToValue(editText.Text.Trim());
+                    if (succ)
+                    {
+                        field.SetValue(val);
+                    }
+                }
+            }
+
+            var warnings = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var field in Settings.Instance.Fields)
+            {
+                var (error, warning) = field.Validate();
+                if (!string.IsNullOrEmpty(error))
+                {
+                    errors.Add(error);
+                }
+                if (!string.IsNullOrEmpty(warning))
+                {
+                    warnings.Add(warning);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                Config.Instance.Reload();   // Revert changes.
+                if (interactive)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("The settings fields have the following errors, and the config changes are not saved.");
+                    foreach (var error in errors)
+                    {
+                        sb.AppendLine(error);
+                    }
+                    Utility.ShowAlert(this, "Settings Errors", sb.ToString(), "OK", endAction);
+                    return;
+                }
+            }
+            else 
+            {
+                Config.Instance.Save();     // Persist the changes when there's no errors.
+                if (warnings.Count > 0)
+                {
+                    if (interactive)
+                    {
+                        var sb = new StringBuilder();
+                        sb.AppendLine("The settings fields have the following warnings, but the changes are saved.");
+                        foreach (var warning in warnings)
+                        {
+                            sb.AppendLine(warning);
+                        }
+                        Utility.ShowAlert(this, "Settings Warnings", sb.ToString(), "OK", endAction);
+                        return;
+                    }
+                }
+            }
+            endAction?.Invoke();
         }
 
-        private void UpdateOrganizationName()
+        private void EditToDefaultReset_Click(object? sender, EventArgs e)
         {
-            var editText = FindViewById<EditText>(Resource.Id.edit_organization_name);
-            var organizationName = Config.Instance.GetValue("organization_name");
-            editText.Text = organizationName ?? "";
-        }
-
-        private void UpdateEditTextsToConfig()
-        {
-            var editPractionerName = FindViewById<EditText>(Resource.Id.edit_practitioner_name);
-            Config.Instance.SetValue("practitioner_name", editPractionerName.Text.Trim());
-
-            var editOrganizationName = FindViewById<EditText>(Resource.Id.edit_organization_name);
-            Config.Instance.SetValue("organization_name", editOrganizationName.Text.Trim());
+            foreach (var field in Settings.Instance.Fields)
+            {
+                if (field.EditorResourceId.HasValue)
+                {
+                    Config.Instance.ClearValue(field.ConfigField);
+                    field.UpdateToUI(this);
+                }
+            }
         }
     }
 }

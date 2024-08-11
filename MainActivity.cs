@@ -331,6 +331,11 @@ namespace BookingSMSReminder
         private bool initializedAndCreated_ = false;
 
         /// <summary>
+        ///  Cache the result of CheckPermission() so CheckPermission() only needs to be called once app-wide.
+        /// </summary>
+        private bool? checkPermissionResult_ = null;
+
+        /// <summary>
         ///  ValidateSettingOnFirstRun() is run only once and this class may be created multiple times, and that's why this flag is static.
         /// </summary>
         private static bool validateSettingsOnFirstRunHasBeenRun_ = false;
@@ -342,7 +347,11 @@ namespace BookingSMSReminder
             // Set our view from the "main" layout resource
             SetContentView(Resource.Layout.activity_main);
 
-            if (!CheckPermissions())
+            if (checkPermissionResult_ == null)
+            {
+                checkPermissionResult_ = CheckPermissions();
+            }
+            if (checkPermissionResult_ == false)
             {
                 return;
             }
@@ -392,6 +401,11 @@ namespace BookingSMSReminder
             initializedAndCreated_ = true;
         }
 
+
+        /// <summary>
+        /// Check permissions and return false if mandatory ones are not granted.
+        /// </summary>
+        /// <returns>False if mandatory permissions are not granted.</returns>
         private bool CheckPermissions()
         {
             var ungrantedMandatory = new List<string>();

@@ -16,14 +16,12 @@
     <AndroidSigningStorePass>moctor</AndroidSigningStorePass>
     <AndroidSigningKeyAlias>smsreminderca</AndroidSigningKeyAlias>
     <AndroidSigningKeyPass></AndroidSigningKeyPass>
-    <DefineConstants>$(DefineConstants);KMP</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AndroidKeyStore>False</AndroidKeyStore>
     <AndroidSigningStorePass>moctor</AndroidSigningStorePass>
     <AndroidSigningKeyAlias>smsreminderca</AndroidSigningKeyAlias>
     <AndroidSigningKeyPass></AndroidSigningKeyPass>
-    <DefineConstants>$(DefineConstants);KMP</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="Resources\layout\row.xml" />

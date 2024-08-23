@@ -29,7 +29,7 @@ namespace BookingSMSReminder
 
         private Data() { }
 
-        public Dictionary<string, Contact> Contacts { get; private set; }
+        public Dictionary<string, Contact> Contacts { get; private set; } = new Dictionary<string, Contact>();
 
         public void ReloadContacts(Context context)
         {

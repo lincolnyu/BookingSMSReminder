@@ -46,8 +46,12 @@ namespace BookingSMSReminder
             }
         }
 
-        // TODO reminder listview adapter
-        //https://www.youtube.com/watch?v=aUFdgLSEl0g
+        /// <summary>
+        ///  Adapter for the reminder items in the list view.
+        /// </summary>
+        /// <remarks>
+        ///  https://www.youtube.com/watch?v=aUFdgLSEl0g
+        /// </remarks>
         class ReminderAdapter : BaseAdapter
         {
             class ViewHolder : Java.Lang.Object
@@ -143,6 +147,8 @@ namespace BookingSMSReminder
 
             private bool looperPrepared_ = false;
 
+            private Handler handler_ = new Handler();
+
             public ReminderChecker(MainActivity context)
             {
                 context_ = context;
@@ -158,6 +164,11 @@ namespace BookingSMSReminder
                 {
                     Looper.Prepare();
                     looperPrepared_ = true;
+                }
+
+                if (!context_.initializedAndCreated_)
+                {
+                    return;
                 }
 
                 try
@@ -180,20 +191,19 @@ namespace BookingSMSReminder
                         delayMs = (long)(dailyRunTime + TimeSpan.FromDays(1) - currentTime.TimeOfDay).TotalMilliseconds;
                     }
 
-                    context_.handler_.PostDelayed(Run, delayMs);
+                    handler_.PostDelayed(Run, delayMs);
                 }
             }
 
             public void StopRepeatingTask()
             {
-                context_.handler_.RemoveCallbacks(Run);
+                handler_.RemoveCallbacks(Run);
             }
         }
 
         class ProcessedRemindersLog
         {
             public string LogFileName { get; }
-
 
             private Dictionary<string, List<DateTime>> cache_ = new Dictionary<string, List<DateTime>>();
             private bool cacheInvalid_ = true;
@@ -319,7 +329,6 @@ namespace BookingSMSReminder
         private ReminderAdapter remindersAdapter_;
         private List<Reminder> reminders_ = new List<Reminder>();
 
-        private Handler handler_;
         private ReminderChecker reminderChecker_;
 
         /// <summary>
@@ -333,7 +342,7 @@ namespace BookingSMSReminder
         /// <summary>
         ///  Cache the result of CheckPermission() so CheckPermission() only needs to be called once app-wide.
         /// </summary>
-        private bool? checkPermissionResult_ = null;
+        private static bool? checkPermissionResult_ = null;
 
         /// <summary>
         ///  ValidateSettingOnFirstRun() is run only once and this class may be created multiple times, and that's why this flag is static.
@@ -346,26 +355,6 @@ namespace BookingSMSReminder
 
             // Set our view from the "main" layout resource
             SetContentView(Resource.Layout.activity_main);
-
-            if (checkPermissionResult_ == null)
-            {
-                checkPermissionResult_ = CheckPermissions();
-            }
-            if (checkPermissionResult_ == false)
-            {
-                return;
-            }
-
-            sentRemindersLog_.CleanUpLogAndAddNewEntry(null);
-            dismissedRemindersLog_.CleanUpLogAndAddNewEntry(null);
-
-            listViewReminders_ = FindViewById<ListView>(Resource.Id.listview_reminders);
-            RegisterForContextMenu(listViewReminders_);
-
-            remindersAdapter_ = new ReminderAdapter(this, reminders_);
-            listViewReminders_.Adapter = remindersAdapter_;
-
-            remindersAdapter_.NotifyDataSetChanged();
 
             var buttonSelectAll = FindViewById<Button>(Resource.Id.button_select_all);
             buttonSelectAll.Click += ButtonSelectAll_Click;
@@ -385,11 +374,34 @@ namespace BookingSMSReminder
             var buttonSettings = FindViewById<Button>(Resource.Id.button_settings);
             buttonSettings.Click += ButtonSettings_Click;
 
+            remindersAdapter_ = new ReminderAdapter(this, reminders_);
+
+            sentRemindersLog_.CleanUpLogAndAddNewEntry(null);
+            dismissedRemindersLog_.CleanUpLogAndAddNewEntry(null);
+
+            listViewReminders_ = FindViewById<ListView>(Resource.Id.listview_reminders);
+            RegisterForContextMenu(listViewReminders_);
+
+            listViewReminders_.Adapter = remindersAdapter_;
+
+            remindersAdapter_.NotifyDataSetChanged();
+
+            StartRepeatingTaskIfHaveNot();
+        }
+
+        private void CheckPermissionsAndInitialize()
+        {
+            if (checkPermissionResult_ != true)
+            {
+                checkPermissionResult_ = CheckPermissions();
+            }
+            if (checkPermissionResult_ == false)
+            {
+                // Will have to come back and check again
+                return;
+            }
+
             Data.Instance.ReloadContacts(this);
-
-            handler_ = new Handler();
-
-            StartRepeatingTask();
 
             if (!validateSettingsOnFirstRunHasBeenRun_)
             {
@@ -400,7 +412,6 @@ namespace BookingSMSReminder
 
             initializedAndCreated_ = true;
         }
-
 
         /// <summary>
         /// Check permissions and return false if mandatory ones are not granted.
@@ -434,7 +445,7 @@ namespace BookingSMSReminder
             {
                 Utility.ShowAlert(this, "Error: Ungranted Permissions", $"Grant the following permissions and then relaunch the app.\n{string.Join('\n', ungrantedMandatory)}", "OK", () =>
                 {
-                    FinishAffinity();
+                    GoToSettingsPageForPermissionRequests();
                 });
                 return false;
             }
@@ -446,21 +457,34 @@ namespace BookingSMSReminder
             return true;
         }
 
+        private void GoToSettingsPageForPermissionRequests()
+        {
+            // https://stackoverflow.com/questions/34754128/android-m-permission-settings-redirect-intent-action
+
+            var intent = new Intent();
+            intent.SetAction(Android.Provider.Settings.ActionApplicationDetailsSettings);
+            var uri = Android.Net.Uri.FromParts("package", PackageName, null);
+
+            intent.SetData(uri);
+            this.StartActivity(intent);
+        }
+
         protected override void OnDestroy()
         {
             base.OnDestroy();
 
-            if (initializedAndCreated_)
-            {
-                StopRepeatingTask();
-            }
+            StopRepeatingTaskIfHaveNot();
         }
 
         protected override void OnResume()
         {
             base.OnResume();
 
-            if (initializedAndCreated_)
+            if (!initializedAndCreated_)
+            {
+                CheckPermissionsAndInitialize();
+            }
+            if (initializedAndCreated_ == true)
             {
                 RefreshAll();
             }
@@ -565,14 +589,21 @@ namespace BookingSMSReminder
             }
         }
 
-        private void StartRepeatingTask()
+        private void StartRepeatingTaskIfHaveNot()
         {
-            reminderChecker_ = new ReminderChecker(this);
+            if (reminderChecker_ == null)
+            {
+                reminderChecker_ = new ReminderChecker(this);
+            }
         }
 
-        private void StopRepeatingTask()
+        private void StopRepeatingTaskIfHaveNot()
         {
-            reminderChecker_.StopRepeatingTask();
+            if (reminderChecker_ != null)
+            {
+                reminderChecker_.StopRepeatingTask();
+                reminderChecker_ = null;
+            }
         }
 
         private void CheckDelayReminder()

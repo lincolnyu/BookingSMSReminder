@@ -16,11 +16,7 @@
     <AndroidSigningStorePass>moctor</AndroidSigningStorePass>
     <AndroidSigningKeyAlias>smsreminderca</AndroidSigningKeyAlias>
     <AndroidSigningKeyPass></AndroidSigningKeyPass>
-<<<<<<< HEAD
     <DefineConstants>$(DefineConstants);KMP</DefineConstants>
-=======
-    <EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
->>>>>>> aa3435e (Get user to the app settings for required permissions.)
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AndroidKeyStore>False</AndroidKeyStore>
@@ -32,9 +28,4 @@
   <ItemGroup>
     <None Remove="Resources\layout\row.xml" />
   </ItemGroup>
-  <!--
-  <ItemGroup>
-    <PackageReference Include="Xamarin.GooglePlayServices.Ads" Version="123.0.0" />
-  </ItemGroup>
-  -->
 </Project>

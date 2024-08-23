@@ -85,5 +85,10 @@
             android:layout_toLeftOf="@id/button_select_all"
             android:id="@+id/listview_reminders">
         </ListView>
+<!--
+        <com.google.android.gms.ads.AdView
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"/>
+        -->
     </LinearLayout>
 </RelativeLayout>

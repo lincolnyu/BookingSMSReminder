@@ -1,7 +1,6 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
-using System.Text;
 using static BookingSMSReminder.Data;
 using static BookingSMSReminder.Settings;
 

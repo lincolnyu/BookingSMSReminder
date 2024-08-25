@@ -166,7 +166,7 @@ namespace BookingSMSReminder
                     looperPrepared_ = true;
                 }
 
-                if (!context_.initializedAndCreated_)
+                if (!MainActivity.permissionRequirementMetAndAppInitialized_)
                 {
                     return;
                 }
@@ -332,17 +332,10 @@ namespace BookingSMSReminder
         private ReminderChecker reminderChecker_;
 
         /// <summary>
-        ///  Whether OnCreate() has been called and the class has been initialized.
+        ///  Store the result of CheckPermission() so CheckPermission() only needs to be called once app-wide.
+        ///  Since initialization is guaranteed to complete after CheckPermission() is passed, thsi also indicates if the app has been initialized.
         /// </summary>
-        /// <remarks>
-        ///  Some methods may be called prior to OnCreate() and actions in them may only be executed after initialization.
-        /// </remarks>
-        private bool initializedAndCreated_ = false;
-
-        /// <summary>
-        ///  Cache the result of CheckPermission() so CheckPermission() only needs to be called once app-wide.
-        /// </summary>
-        private static bool? checkPermissionResult_ = null;
+        private static bool permissionRequirementMetAndAppInitialized_ = false;
 
         /// <summary>
         ///  ValidateSettingOnFirstRun() is run only once and this class may be created multiple times, and that's why this flag is static.
@@ -389,72 +382,77 @@ namespace BookingSMSReminder
             StartRepeatingTaskIfHaveNot();
         }
 
-        private void CheckPermissionsAndInitialize()
+        private void CheckPermissionsAndInitializeIfNot()
         {
-            if (checkPermissionResult_ != true)
-            {
-                checkPermissionResult_ = CheckPermissions();
-            }
-            if (checkPermissionResult_ == false)
-            {
-                // Will have to come back and check again
-                return;
-            }
+            CheckPermissionsIfNot(() => {
+                Data.Instance.ReloadContacts(this);
 
-            Data.Instance.ReloadContacts(this);
+                if (!validateSettingsOnFirstRunHasBeenRun_)
+                {
+                    // Run this only onece
+                    ValidateSettingsOnFirstRun();
+                    validateSettingsOnFirstRunHasBeenRun_ = true;
+                }
+            });
 
-            if (!validateSettingsOnFirstRunHasBeenRun_)
-            {
-                // Run this only onece
-                ValidateSettingsOnFirstRun();
-                validateSettingsOnFirstRunHasBeenRun_ = true;
-            }
-
-            initializedAndCreated_ = true;
+            // Upon failure checkPermissionResult_ is set to false and we will come back and check again
         }
 
         /// <summary>
-        /// Check permissions and return false if mandatory ones are not granted.
+        ///  Check permissions and return false if mandatory ones are not granted.
         /// </summary>
-        /// <returns>False if mandatory permissions are not granted.</returns>
-        private bool CheckPermissions()
+        /// <param name="onPassed">Called when mandatory permissions are granted.</param>
+        /// <returns>True if mandatory permissions are granted.</returns>
+        private void CheckPermissionsIfNot(Action onPassed)
         {
-            var ungrantedMandatory = new List<string>();
-            var ungrantedOptional = new List<string>();
-            if (CheckSelfPermission(Manifest.Permission.ReadCalendar) != Android.Content.PM.Permission.Granted)
+            lock(this)  // To protect permissionRequirementMet_
             {
-                ungrantedMandatory.Add("Read Calendar");
-            }
-
-            if (CheckSelfPermission(Manifest.Permission.ReadContacts) != Android.Content.PM.Permission.Granted)
-            {
-                ungrantedMandatory.Add("Read Contacts");
-            }
-
-            if (CheckSelfPermission(Manifest.Permission.PostNotifications) != Android.Content.PM.Permission.Granted)
-            {
-                ungrantedOptional.Add("Post Notifications");
-            }
-
-            if (CheckSelfPermission(Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
-            {
-                ungrantedMandatory.Add("Send SMS");
-            }
-
-            if (ungrantedMandatory.Count > 0)
-            {
-                Utility.ShowAlert(this, "Error: Ungranted Permissions", $"Grant the following permissions and then relaunch the app.\n{string.Join('\n', ungrantedMandatory)}", "OK", () =>
+                if (permissionRequirementMetAndAppInitialized_)
                 {
-                    GoToSettingsPageForPermissionRequests();
-                });
-                return false;
-            }
+                    return;
+                }
 
-            if (ungrantedOptional.Count > 0)
-            {
-                Utility.ShowAlert(this, "Warning: Ungranted Permissions", $"The following optional permissions are not granted.\n{string.Join('\n', ungrantedOptional)}", "OK");
+                var ungrantedMandatory = new List<string>();
+                var ungrantedOptional = new List<string>();
+                if (CheckSelfPermission(Manifest.Permission.ReadCalendar) != Android.Content.PM.Permission.Granted)
+                {
+                    ungrantedMandatory.Add("Read Calendar");
+                }
+
+                if (CheckSelfPermission(Manifest.Permission.ReadContacts) != Android.Content.PM.Permission.Granted)
+                {
+                    ungrantedMandatory.Add("Read Contacts");
+                }
+
+                if (CheckSelfPermission(Manifest.Permission.PostNotifications) != Android.Content.PM.Permission.Granted)
+                {
+                    ungrantedOptional.Add("Post Notifications");
+                }
+
+                if (CheckSelfPermission(Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
+                {
+                    ungrantedMandatory.Add("Send SMS");
+                }
+
+                if (ungrantedMandatory.Count > 0)
+                {
+                    Utility.ShowAlert(this, "Error: Ungranted Permissions", $"Grant the following permissions and then relaunch the app.\n{string.Join('\n', ungrantedMandatory)}", "OK", () =>
+                    {
+                        GoToSettingsPageForPermissionRequests();
+                    });
+                    return;
+                }
+
+                if (ungrantedOptional.Count > 0)
+                {
+                    Utility.ShowAlert(this, "Warning: Ungranted Permissions", $"The following optional permissions are not granted.\n{string.Join('\n', ungrantedOptional)}", "OK", onPassed);
+                }
+                else
+                {
+                    onPassed();
+                }
+                permissionRequirementMetAndAppInitialized_ = true;
             }
-            return true;
         }
 
         private void GoToSettingsPageForPermissionRequests()
@@ -480,11 +478,9 @@ namespace BookingSMSReminder
         {
             base.OnResume();
 
-            if (!initializedAndCreated_)
-            {
-                CheckPermissionsAndInitialize();
-            }
-            if (initializedAndCreated_ == true)
+            CheckPermissionsAndInitializeIfNot();
+            
+            if (permissionRequirementMetAndAppInitialized_)
             {
                 RefreshAll();
             }
@@ -579,7 +575,7 @@ namespace BookingSMSReminder
                 if (warnings.Count > 0)
                 {
                     var sb = new StringBuilder();
-                    sb.AppendLine("The settings fields have the following warnings:");
+                    sb.AppendLine("The settings fields have the following warning issues:");
                     foreach (var warning in warnings)
                     {
                         sb.AppendLine(warning);

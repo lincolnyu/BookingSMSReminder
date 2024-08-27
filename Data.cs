@@ -44,8 +44,10 @@ namespace BookingSMSReminder
                 ContactsContract.RawContacts.InterfaceConsts.DisplayNamePrimary,
             };
 
+            var contactsAccountName = ((Settings.Field<string>)Settings.Instance.Fields[Settings.FieldIndex.ContactsAccountName]).Value ?? "";
+
             var selectionString = ContactsContract.RawContacts.InterfaceConsts.AccountName + "=?";
-            var selectionStringArgs = new string[] { "kineticmobilept@gmail.com" };
+            var selectionStringArgs = new string[] { contactsAccountName };
             var loader = new CursorLoader(context, uri, projection, selectionString, selectionStringArgs, null);
             var cursor = (ICursor)loader.LoadInBackground();
 

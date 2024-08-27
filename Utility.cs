@@ -1,6 +1,7 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
+using System.Text.RegularExpressions;
 using static BookingSMSReminder.Data;
 using static BookingSMSReminder.Settings;
 
@@ -75,7 +76,7 @@ namespace BookingSMSReminder
             builder.Show();
         }
 
-        public static int? GetKmpCalendarId(Context context)
+        public static int? GetKmpCalendarId(Settings settings, Context context)
         {
             var calendarsUri = CalendarContract.Calendars.ContentUri;
 
@@ -84,6 +85,10 @@ namespace BookingSMSReminder
                 CalendarContract.Calendars.InterfaceConsts.CalendarDisplayName,
                 CalendarContract.Calendars.InterfaceConsts.AccountName
             };
+
+            // If they are null (specified) no matching calendar ID will be found and null will be returned.
+            var configuredCalendarAccountName = ((Field<string>)settings.Fields[Settings.FieldIndex.CalendarAccountName]).Value;
+            var configuredCalendarDisplayName = ((Field<string>)settings.Fields[Settings.FieldIndex.CalendarDisplayName]).Value;
 
             var loader = new CursorLoader(context, calendarsUri, calendarsProjection, null, null, null);
             var cursor = (ICursor)loader.LoadInBackground();
@@ -95,7 +100,7 @@ namespace BookingSMSReminder
                 int calId = cursor.GetInt(cursor.GetColumnIndex(calendarsProjection[0]));
                 string calDisplayName = cursor.GetString(cursor.GetColumnIndex(calendarsProjection[1]));
                 string calAccountName = cursor.GetString(cursor.GetColumnIndex(calendarsProjection[2]));
-                if (calAccountName == "kineticmobilept@gmail.com" && calDisplayName == "kineticmobilept@gmail.com")
+                if (calAccountName == configuredCalendarAccountName && calDisplayName == configuredCalendarDisplayName)
                 {
                     return calId;
                 }
@@ -103,12 +108,17 @@ namespace BookingSMSReminder
             return null;
         }
 
-        public static TimeOnly GetDailyNotificationTime()
+        public static TimeOnly GetDailyNotificationTime(Settings settings)
         {
-            var field = (Settings.Field<TimeOnly>)Settings.Instance.Fields[Settings.FieldIndex.DailyNotificationTime];
+            var field = (Settings.Field<TimeOnly>)settings.Fields[Settings.FieldIndex.DailyNotificationTime];
             return field.Value;
         }
 
+        /// <summary>
+        ///  Returns the match if contact list contains one and only one name of which all the words cover the split words of <paramref name="name"/>.
+        /// </summary>
+        /// <param name="name">The name to find contat </param>
+        /// <returns>The match</returns>
         public static Contact? SmartFindContact(string name)
         {
             var nameLower = name.ToLower();
@@ -159,7 +169,7 @@ namespace BookingSMSReminder
 
         public static string GenerateMessage(Settings settings, Contact? contact, DateTime startDateTime, List<string>? settingsErrors)
         {
-            var messageTemplateField= (Field<string>)settings.Fields[Settings.FieldIndex.MessageTemplate];
+            var messageTemplateField = (Field<string>)settings.Fields[Settings.FieldIndex.MessageTemplate];
             var messageTemplate = messageTemplateField.Value;
 
             if (string.IsNullOrWhiteSpace(messageTemplate)) return "";
@@ -183,7 +193,7 @@ namespace BookingSMSReminder
                     message = message.Replace("<consultant>", consultantName);
                 }
             }
-            
+
             if (message.Contains("<organization"))
             {
                 var organizationNameField = (Field<string>)settings.Fields[Settings.FieldIndex.OrganizationName];
@@ -242,12 +252,57 @@ namespace BookingSMSReminder
         {
             var dummyContact = new Contact("David Smiths");
             var errors = new List<string>();
-            var message = GenerateMessage(settings, dummyContact, new DateTime(2000,12,31, 18, 30, 30), errors);
+            var message = GenerateMessage(settings, dummyContact, new DateTime(2000, 12, 31, 18, 30, 30), errors);
             if (message.Length > MaxAllowedSMSLength)
             {
                 errors.Insert(0, "Message may exceed 160 character limit.");
             }
             return string.Join(" ", errors);
+        }
+
+        public static string GenerateEventTitle(Settings settings, string clientName)
+        {
+            var appAddedEventTitle = ((Settings.Field<string>)settings.Fields[Settings.FieldIndex.AppAddedEventTitle]).Value ?? "<client>";
+            return appAddedEventTitle.Replace("<client>", clientName);
+        }
+
+        /// <summary>
+        ///  Extract client name from event title.
+        /// </summary>
+        /// <param name="eventTitle">The event title to extract client name from</param>
+        /// <param name="regexList">Regex patterns ordered by precedence</param>
+        /// <returns>The client name if found or null</returns>
+        public static string? ParseClientName(string eventTitle, Regex[] regexList)
+        {
+            foreach (var regex in regexList)
+            {
+                var m = regex.Match(eventTitle);
+                if (m.Success && m.Value == eventTitle)
+                {
+                    if (m.Groups[1].Success)
+                    {
+                        return m.Groups[1].Value;
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static string EventTitleFormatToRegexPattern(string eventTitleFormat, bool wasRegex)
+        {
+            var pattern = eventTitleFormat;
+            if (!wasRegex)
+            {
+                char[] RegexReservedChars = ['[', ']', '(', ')', '.', '*', '+'];
+                foreach (var c in RegexReservedChars)
+                {
+                    pattern = pattern.Replace($"{c}", @"\" + c);
+                }
+            }
+
+            pattern = pattern.Replace("<client>", @"([A-Za-z '\-\.][A-Za-z0-9 '\-\.]*)");
+
+            return pattern;
         }
     }
 }

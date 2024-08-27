@@ -140,7 +140,7 @@ namespace BookingSMSReminder
                 }
                 int durationMs = durationMins * 60 * 1000;
 
-                var kmpCalId = Utility.GetKmpCalendarId(this);
+                var kmpCalId = Utility.GetKmpCalendarId(Settings.Instance, this);
 
                 if (kmpCalId == null)
                 {
@@ -150,7 +150,7 @@ namespace BookingSMSReminder
 
                 ContentValues values = new ContentValues();
                 values.Put("calendar_id", kmpCalId.Value);
-                values.Put("title", $"{client} booking");
+                values.Put("title", $"{Utility.GenerateEventTitle(Settings.Instance, client)}");
                 values.Put("dtstart", calendar_.TimeInMillis);
                 values.Put("dtend", calendar_.TimeInMillis + durationMs);
                 values.Put("eventTimezone", Java.Util.TimeZone.Default.ID);
@@ -200,7 +200,7 @@ namespace BookingSMSReminder
                 intent.PutExtra("beginTime", calendar_.TimeInMillis);
                 intent.PutExtra("allDay", false);
                 intent.PutExtra("endTime", calendar_.TimeInMillis + durationMs);
-                intent.PutExtra("title", $"{client} booking");
+                intent.PutExtra("title", $"{Utility.GenerateEventTitle(Settings.Instance, client)}");
                 StartActivity(intent);
 
                 // This will open up a new event dialog from Calendar app.

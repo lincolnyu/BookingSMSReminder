@@ -9,6 +9,7 @@ using Android.Provider;
 using Android.Telephony;
 using Android.Views;
 using System.Text;
+using System.Text.RegularExpressions;
 using static Android.Widget.AdapterView;
 
 namespace BookingSMSReminder
@@ -178,9 +179,8 @@ namespace BookingSMSReminder
                 finally
                 {
                     long delayMs = 0;
-                    // TODO assign delay MS
 
-                    var dailyRunTime = Utility.GetDailyNotificationTime().ToTimeSpan();
+                    var dailyRunTime = Utility.GetDailyNotificationTime(Settings.Instance).ToTimeSpan();
                     var currentTime = DateTime.Now;
                     if (currentTime.TimeOfDay < dailyRunTime)
                     {
@@ -731,12 +731,20 @@ namespace BookingSMSReminder
 
         private IEnumerable<Reminder> GenerateReminders()
         {
-            //https://learn.microsoft.com/en-gb/previous-versions/xamarin/android/user-interface/controls/calendar
+            // https://learn.microsoft.com/en-gb/previous-versions/xamarin/android/user-interface/controls/calendar
 
-            var kmpCalId = Utility.GetKmpCalendarId(this);
+            var kmpCalId = Utility.GetKmpCalendarId(Settings.Instance, this);
 
             if (kmpCalId.HasValue)
             {
+                var eventTitleFormat = ((Settings.Field<string>)Settings.Instance.Fields[Settings.FieldIndex.EventTitleFormat]).Value?.Trim() ?? "<client>";
+                var eventTitleRegexPattern = Utility.EventTitleFormatToRegexPattern(eventTitleFormat, true);
+                var regexEventTitle = new Regex(eventTitleRegexPattern);
+
+                var appAddedEventTitle = ((Settings.Field<string>)Settings.Instance.Fields[Settings.FieldIndex.AppAddedEventTitle]).Value?.Trim() ?? "<client>";
+                var appAddedEventTitleRegexPattern = Utility.EventTitleFormatToRegexPattern(appAddedEventTitle, false);
+                var regexAppAddedEventTitle = new Regex(appAddedEventTitleRegexPattern);
+
                 var eventsUri = CalendarContract.Events.ContentUri;
 
                 string[] eventsProjection = {
@@ -745,8 +753,7 @@ namespace BookingSMSReminder
                     CalendarContract.Events.InterfaceConsts.Dtstart,
                 };
 
-                var eventLoader = new CursorLoader(this, eventsUri, eventsProjection,
-                                    string.Format("calendar_id={0}", kmpCalId.Value), null, "dtstart ASC");
+                var eventLoader = new CursorLoader(this, eventsUri, eventsProjection, $"calendar_id={kmpCalId.Value}", null, "dtstart ASC");
 
                 var eventCursor = (ICursor)eventLoader.LoadInBackground();
                 for (var moveSucceeded = eventCursor.MoveToLast(); moveSucceeded; moveSucceeded = eventCursor.MoveToPrevious())
@@ -764,81 +771,75 @@ namespace BookingSMSReminder
 
                     if (IsRemindableStartTime(dtStart))
                     {
-                        // assume eventTitle contains the name
-                        var clientName = eventTitle;
-
-                        var index = clientName.IndexOf("booking", StringComparison.OrdinalIgnoreCase);
-                        if (index >= 0)
+                        var clientName = Utility.ParseClientName(eventTitle, [regexEventTitle, regexAppAddedEventTitle]);
+                        if (clientName != null)
                         {
-                            clientName = clientName[..index].Trim();
-                        }
+                            var contact = Utility.SmartFindContact(clientName);
 
-                        var contact = Utility.SmartFindContact(clientName);
+                            var reminderMessage = Utility.GenerateMessage(Settings.Instance, contact, dtStart, null);
 
-                        var reminderMessage = Utility.GenerateMessage(Settings.Instance, contact, dtStart, null);
+                            string name;
+                            string? nameInCalendar = null;
+                            string? reminderStatusDescription = null;
+                            string? phoneNumber = null;
 
-                        string name;
-                        string? nameInCalendar = null;
-                        string? reminderStatusDescription = null;
-                        string? phoneNumber = null;
+                            Reminder.StatusEnum status;
 
-                        Reminder.StatusEnum status;
-
-                        if (contact != null)
-                        {
-                            name = contact.DisplayName;
-                            nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
-                            phoneNumber = contact.MostLikelyNumber;
-
-                            if (dismissedRemindersLog_.GetIfMessageLogged(contact, dtStart))
+                            if (contact != null)
                             {
-                                status = Reminder.StatusEnum.Dismissed;
-                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} is dismissed.";
-                            }
-                            else if (sentRemindersLog_.GetIfMessageLogged(contact, dtStart))
-                            {
-                                status = Reminder.StatusEnum.Sent;
-                                reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} already sent.";
-                            }
-                            else if (contact.MostLikelyNumber != null)
-                            {
-                                status = Reminder.StatusEnum.Pending;
+                                name = contact.DisplayName;
+                                nameInCalendar = clientName.ToLower() != contact.DisplayName.ToLower() ? clientName : null;
+                                phoneNumber = contact.MostLikelyNumber;
+
+                                if (dismissedRemindersLog_.GetIfMessageLogged(contact, dtStart))
+                                {
+                                    status = Reminder.StatusEnum.Dismissed;
+                                    reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} is dismissed.";
+                                }
+                                else if (sentRemindersLog_.GetIfMessageLogged(contact, dtStart))
+                                {
+                                    status = Reminder.StatusEnum.Sent;
+                                    reminderStatusDescription = $"Reminder for {contact.DisplayName} on {Utility.PrintDateTime(dtStart)} already sent.";
+                                }
+                                else if (contact.MostLikelyNumber != null)
+                                {
+                                    status = Reminder.StatusEnum.Pending;
+                                }
+                                else
+                                {
+                                    status = Reminder.StatusEnum.Error;
+                                    reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {Utility.PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
+                                }
                             }
                             else
                             {
+                                name = clientName;
                                 status = Reminder.StatusEnum.Error;
-                                reminderStatusDescription = $"ERROR: Unable to send message to {clientName} for an appt {Utility.PrintDateTime(dtStart)} since no valid mobile phone number is provided. This reminder needs to be manually handled.";
+                                reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {Utility.PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
                             }
-                        }
-                        else
-                        {
-                            name = clientName;
-                            status = Reminder.StatusEnum.Error;
-                            reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {Utility.PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
-                        }
 
-                        yield return new Reminder
-                        {
-                            Status = status,
-                            Selected = false,
-                            Name = name,
-                            NameInCalendar = nameInCalendar,
-                            PhoneNumber = phoneNumber,
-                            StatusDescription = reminderStatusDescription,
-                            Message = reminderMessage,
-                            Contact = contact,
-                            StartTime = dtStart
-                        };
+                            yield return new Reminder
+                            {
+                                Status = status,
+                                Selected = false,
+                                Name = name,
+                                NameInCalendar = nameInCalendar,
+                                PhoneNumber = phoneNumber,
+                                StatusDescription = reminderStatusDescription,
+                                Message = reminderMessage,
+                                Contact = contact,
+                                StartTime = dtStart
+                            };
+                        }
                     }
                 }
             }
         }
 
-
-
         private static bool IsRemindableStartTime(DateTime dtStart)
         {
-            return dtStart.Date - DateTime.Now.Date == TimeSpan.FromDays(1);
+            var reminderDaysAheadField = (Settings.Field<int>)Settings.Instance.Fields[Settings.FieldIndex.ReminderDaysAhead];
+            return dtStart.Date - DateTime.Now.Date == TimeSpan.FromDays(reminderDaysAheadField.Value);
         }
     }
 }

@@ -161,7 +161,10 @@
             public const int CalendarAccountName = 7;
             public const int CalendarDisplayName = 8;
 
-            public const int Total = 9;
+            public const int EventTitleFormat = 9;      // TODO not used
+            public const int AppAddedEventTitle = 10;   // TODO not used
+
+            public const int Total = 11;
         }
 
         protected Settings()
@@ -269,8 +272,8 @@
 
             Fields[FieldIndex.CalendarAccountName] = new Field<string>
             {
-                ConfigField= "calendar_account_name",
-                EditorResourceId  = Resource.Id.edit_calendar_account_name,
+                ConfigField = "calendar_account_name",
+                EditorResourceId = Resource.Id.edit_calendar_account_name,
                 ValidateFunc = val =>
                 {
                     if (string.IsNullOrEmpty(val))
@@ -298,6 +301,45 @@
                 }
 #if KMP
                 , DefaultValue = "kineticmobilept@gmail.com"
+#endif
+            };
+
+            Fields[FieldIndex.EventTitleFormat] = new Field<string>
+            {
+                ConfigField = "event_title_format",
+                EditorResourceId = Resource.Id.edit_event_title_format,
+                ValidateFunc = val =>
+                {
+                    if (string.IsNullOrEmpty(val))
+                    {
+                        return ("", "Missing event title format.");
+                    }
+                    return ("", "");
+                }
+#if KMP
+                ,
+                DefaultValue = "<client>( booking| [^A-Za-z '\\-].*|)"
+#endif
+            };
+
+
+            Fields[FieldIndex.AppAddedEventTitle] = new Field<string>
+            {
+                ConfigField = "app_added_event_title",
+                EditorResourceId = Resource.Id.edit_app_added_event_title,
+                ValidateFunc = val =>
+                {
+                    if (string.IsNullOrEmpty(val))
+                    {
+                        return ("", "Missing app added event title.");
+                    }
+                    return ("", "");
+                },
+#if KMP
+                
+                DefaultValue = "<client> booking"
+#else
+                DefaultValue = "[<client>]"
 #endif
             };
         }

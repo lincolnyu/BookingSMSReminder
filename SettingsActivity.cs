@@ -81,7 +81,7 @@ namespace BookingSMSReminder
                 field.UpdateToUI(this);
             };
 
-            var notificationTime = Utility.GetDailyNotificationTime();
+            var notificationTime = Utility.GetDailyNotificationTime(Settings.Instance);
             var timePickerDialog = new TimePickerDialog(this, handler, notificationTime.Hour, notificationTime.Minute, false);
             timePickerDialog.Show();
         }

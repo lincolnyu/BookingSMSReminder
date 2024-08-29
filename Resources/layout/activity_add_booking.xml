@@ -18,14 +18,14 @@
             android:layout_alignParentLeft="true" />
       <TextView
            android:text="Add Booking"
-           android:textSize="80px"
+           android:textSize="64px"
             android:textStyle="italic"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
       
       <TextView
         android:text="Client Name"
-        android:textSize="60px"
+        android:textSize="48px"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
@@ -36,7 +36,7 @@
 
       <TextView
         android:text="Appointment Date"
-        android:textSize="60px"
+        android:textSize="48px"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
@@ -50,7 +50,7 @@
 
       <TextView
         android:text="Appointment Time"
-        android:textSize="60px"
+        android:textSize="48px"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
       <EditText
@@ -63,7 +63,7 @@
 
       <TextView
         android:text="Appointment Duration (Minutes)"
-        android:textSize="60px"
+        android:textSize="48px"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 

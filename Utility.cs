@@ -1,6 +1,7 @@
 ﻿using Android.Content;
 using Android.Database;
 using Android.Provider;
+using System.Text;
 using System.Text.RegularExpressions;
 using static BookingSMSReminder.Data;
 using static BookingSMSReminder.Settings;
@@ -300,7 +301,24 @@ namespace BookingSMSReminder
                 }
             }
 
-            pattern = pattern.Replace("<client>", @"([A-Za-z '\-\.][A-Za-z0-9 '\-\.]*)");
+            const string ClientNameUnit = "[A-Za-z][A-Za-z0-9'\\-\\.]*[ ,]*";
+            const int MaxClientNameUnitsCount = 5;
+            var sbClientPattern = new StringBuilder("(");
+
+            for (var i = 1; i <= MaxClientNameUnitsCount; i++)
+            {
+                if (i != 1)
+                {
+                    sbClientPattern.Append("|");
+                }
+                for (var j = 0; j < i; j++)
+                {
+                    sbClientPattern.Append(ClientNameUnit);
+                }
+            }
+            sbClientPattern.Append(")");
+
+            pattern = pattern.Replace("<client>", sbClientPattern.ToString());
 
             return pattern;
         }

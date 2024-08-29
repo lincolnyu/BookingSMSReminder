@@ -52,7 +52,7 @@
             android:layout_height="wrap_content" />
 
         <TextView
-            android:text="Reminding Day Ahead of Appointment"
+            android:text="Reminder Lead Time in Number of Days"
             android:textSize="48px"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>

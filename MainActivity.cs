@@ -17,6 +17,9 @@ namespace BookingSMSReminder
     [Activity(Label = "@string/app_name", MainLauncher = true)]
     public class MainActivity : Activity
     {
+        // TODO This is an app setting. May need to be moved to a settings file.
+        public static bool AlwaysRefreshContacts = false;    // Refreshing large amount contacts is slow and should be avoided.
+
         class Reminder
         {
             public bool Selected;
@@ -341,6 +344,7 @@ namespace BookingSMSReminder
         ///  ValidateSettingOnFirstRun() is run only once and this class may be created multiple times, and that's why this flag is static.
         /// </summary>
         private static bool validateSettingsOnFirstRunHasBeenRun_ = false;
+        private bool contactsRefreshed_ = false;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -385,7 +389,7 @@ namespace BookingSMSReminder
         private void CheckPermissionsAndInitializeIfNot()
         {
             CheckPermissionsIfNot(() => {
-                Data.Instance.ReloadContacts(this);
+                Data.Instance.ReloadContacts(this, true);
 
                 if (!validateSettingsOnFirstRunHasBeenRun_)
                 {
@@ -537,7 +541,11 @@ namespace BookingSMSReminder
 
         public void RefreshAll()
         {
-            Data.Instance.ReloadContacts(this);
+            if (!contactsRefreshed_ || AlwaysRefreshContacts)
+            {
+                Data.Instance.ReloadContacts(this, false);
+                contactsRefreshed_ = true;
+            }
 
             RefreshReminders();
         }
@@ -610,7 +618,7 @@ namespace BookingSMSReminder
             {
                 const string NotificationText = "Need to review and run daily reminder.";
                 var notification = new Notification(Resource.Mipmap.appicon, NotificationText, System.Environment.TickCount);
-                PendingIntent contentIntent = PendingIntent.GetActivity(this, 0, new Intent(this, typeof(MainActivity)), 0);
+                PendingIntent contentIntent = PendingIntent.GetActivity(this, 0, new Intent(this, typeof(MainActivity)), PendingIntentFlags.Mutable);
                 notification.SetLatestEventInfo(this, "Booking SMS Reminder", NotificationText, contentIntent);
                 var nm = (NotificationManager)GetSystemService(NotificationService);
                 nm.Notify(0, notification);

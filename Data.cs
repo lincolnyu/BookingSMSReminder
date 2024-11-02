@@ -31,9 +31,32 @@ namespace BookingSMSReminder
 
         public Dictionary<string, Contact> Contacts { get; private set; } = new Dictionary<string, Contact>();
 
-        public void ReloadContacts(Context context)
+        public void ReloadContacts(Context context, bool showWarning)
         {
-            Contacts = LoadContacts(context).ToDictionary(x => x.DisplayName.ToLower());
+            bool containsDuplicateKeys = false;
+            Contacts.Clear();
+            var duplicateNames = new List<string>();
+            foreach (var contact in LoadContacts(context))
+            {
+                var key = contact.DisplayName.ToLower();
+                if (!Contacts.TryGetValue(key, out var val))
+                {
+                    Contacts[key] = contact;
+                    duplicateNames.Add(key);
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(val.MostLikelyNumber) && !string.IsNullOrWhiteSpace(val.MostLikelyNumber))
+                    {
+                        Contacts[key] = contact;
+                    }
+                    containsDuplicateKeys = true;
+                }
+            }
+            if (containsDuplicateKeys && showWarning)
+            {
+                Utility.ShowAlert(context, "Warning: Duplicate Contacts", $"Duplicate contacts found: { string.Join(", ", duplicateNames) }.", "OK");
+            }
         }
 
         private IEnumerable<Contact> LoadContacts(Context context)
@@ -65,7 +88,16 @@ namespace BookingSMSReminder
                     string[] selectionStringArgs2 = [id];
                     string selectionString2 = ContactsContract.CommonDataKinds.Phone.InterfaceConsts.ContactId + "=?";
                     var loader2 = new CursorLoader(context, ContactsContract.CommonDataKinds.Phone.ContentUri, columnsNames2, selectionString2, selectionStringArgs2, null);
-                    var cursor2 = (ICursor)loader2.LoadInBackground();
+
+                    ICursor cursor2;
+                    try
+                    {
+                        cursor2 = (ICursor)loader2.LoadInBackground();
+                    }
+                    catch (Java.Lang.IllegalArgumentException)
+                    {
+                        continue;
+                    }
 
                     string? mostLikelyNumber = null;
                     if (cursor2 != null && cursor2.MoveToFirst())

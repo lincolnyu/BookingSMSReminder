@@ -58,7 +58,7 @@ namespace BookingSMSReminder
         {
             base.OnResume();
 
-            Data.Instance.ReloadContacts(this);
+            // Seems no need to reload contacts here...
         }
 
         private void EditTime_Click(object? sender, EventArgs e)

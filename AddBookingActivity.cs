@@ -140,16 +140,16 @@ namespace BookingSMSReminder
                 }
                 int durationMs = durationMins * 60 * 1000;
 
-                var kmpCalId = Utility.GetKmpCalendarId(Settings.Instance, this);
+                var calId = Utility.GetCalendarId(Settings.Instance, this);
 
-                if (kmpCalId == null)
+                if (calId == null)
                 {
                     Utility.ShowAlert(this, "Error", "Business calendar not found.", "OK");
                     return;
                 }
 
                 ContentValues values = new ContentValues();
-                values.Put("calendar_id", kmpCalId.Value);
+                values.Put("calendar_id", calId.Value);
                 values.Put("title", $"{Utility.GenerateEventTitle(Settings.Instance, client)}");
                 values.Put("dtstart", calendar_.TimeInMillis);
                 values.Put("dtend", calendar_.TimeInMillis + durationMs);

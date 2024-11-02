@@ -77,7 +77,7 @@ namespace BookingSMSReminder
             builder.Show();
         }
 
-        public static int? GetKmpCalendarId(Settings settings, Context context)
+        public static int? GetCalendarId(Settings settings, Context context)
         {
             var calendarsUri = CalendarContract.Calendars.ContentUri;
 
@@ -94,7 +94,6 @@ namespace BookingSMSReminder
             var loader = new CursorLoader(context, calendarsUri, calendarsProjection, null, null, null);
             var cursor = (ICursor)loader.LoadInBackground();
 
-            int? kmpCalId = null;
             bool moveSucceeded = false;
             for (moveSucceeded = cursor.MoveToFirst(); moveSucceeded; moveSucceeded = cursor.MoveToNext())
             {

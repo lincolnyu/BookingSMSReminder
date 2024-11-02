@@ -733,9 +733,9 @@ namespace BookingSMSReminder
         {
             // https://learn.microsoft.com/en-gb/previous-versions/xamarin/android/user-interface/controls/calendar
 
-            var kmpCalId = Utility.GetKmpCalendarId(Settings.Instance, this);
+            var calId = Utility.GetCalendarId(Settings.Instance, this);
 
-            if (kmpCalId.HasValue)
+            if (calId.HasValue)
             {
                 var eventTitleFormat = ((Settings.Field<string>)Settings.Instance.Fields[Settings.FieldIndex.EventTitleFormat]).Value?.Trim() ?? "<client>";
                 var eventTitleRegexPattern = Utility.EventTitleFormatToRegexPattern(eventTitleFormat, true);
@@ -753,7 +753,7 @@ namespace BookingSMSReminder
                     CalendarContract.Events.InterfaceConsts.Dtstart,
                 };
 
-                var eventLoader = new CursorLoader(this, eventsUri, eventsProjection, $"calendar_id={kmpCalId.Value}", null, "dtstart ASC");
+                var eventLoader = new CursorLoader(this, eventsUri, eventsProjection, $"calendar_id={calId.Value}", null, "dtstart ASC");
 
                 var eventCursor = (ICursor)eventLoader.LoadInBackground();
                 for (var moveSucceeded = eventCursor.MoveToLast(); moveSucceeded; moveSucceeded = eventCursor.MoveToPrevious())

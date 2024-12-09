@@ -48,6 +48,20 @@ namespace BookingSMSReminder
                 var nameStr = NameInCalendar != null ? $"{NameInCalendar}->{Name}" : Name;
                 return Status == StatusEnum.Pending ? $"[{nameStr}, {PhoneNumber}] {Message}" : StatusDescription;
             }
+
+            public override bool Equals(object? obj)
+            {
+                if (obj is Reminder other)
+                {
+                    return Name == other.Name && PhoneNumber == other.PhoneNumber && Message == other.Message && StartTime == other.StartTime;
+                }
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return (Name??"").GetHashCode() ^ (PhoneNumber??"").GetHashCode() ^ (Message??"").GetHashCode() ^ StartTime.GetHashCode();
+            }
         }
 
         /// <summary>
@@ -731,7 +745,7 @@ namespace BookingSMSReminder
             PendingIntent sentPI;
             const string SENT = "SMS_SENT";
 
-            sentPI = PendingIntent.GetBroadcast(this, 0, new Intent(SENT), 0);
+            sentPI = PendingIntent.GetBroadcast(this, 0, new Intent(SENT), PendingIntentFlags.Immutable);
 
             smsManager.SendTextMessage(phone, null, message, sentPI, null);
 #endif
@@ -762,6 +776,8 @@ namespace BookingSMSReminder
                 };
 
                 var eventLoader = new CursorLoader(this, eventsUri, eventsProjection, $"calendar_id={calId.Value}", null, "dtstart ASC");
+
+                var generatedReminders = new HashSet<Reminder>();
 
                 var eventCursor = (ICursor)eventLoader.LoadInBackground();
                 for (var moveSucceeded = eventCursor.MoveToLast(); moveSucceeded; moveSucceeded = eventCursor.MoveToPrevious())
@@ -826,7 +842,7 @@ namespace BookingSMSReminder
                                 reminderStatusDescription = $"ERROR: Unable to find contact detail for {clientName} for an appt {Utility.PrintDateTime(dtStart)}. This reminder needs to be manually handled.";
                             }
 
-                            yield return new Reminder
+                            var reminder = new Reminder
                             {
                                 Status = status,
                                 Selected = false,
@@ -838,6 +854,15 @@ namespace BookingSMSReminder
                                 Contact = contact,
                                 StartTime = dtStart
                             };
+
+                            if (generatedReminders.Contains(reminder))
+                            {
+                                continue;
+                            }
+
+                            generatedReminders.Add(reminder);
+
+                            yield return reminder;
                         }
                     }
                 }
